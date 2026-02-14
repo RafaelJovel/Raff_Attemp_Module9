@@ -4,6 +4,7 @@ using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Prompts;
 using FeatureAssessment.Core.Tools;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
 using Microsoft.SemanticKernel.Connectors.OpenAI;
@@ -12,6 +13,7 @@ namespace FeatureAssessment.Core.Agents;
 
 /// <summary>
 /// Agent that uses LLM to translate natural language queries into feature metadata.
+/// Uses IOptions pattern for configuration and supports resilience policies.
 /// </summary>
 public class FeatureLookupAgent : IFeatureLookupAgent
 {
@@ -21,11 +23,12 @@ public class FeatureLookupAgent : IFeatureLookupAgent
 
     public FeatureLookupAgent(
         IFeatureLookupTools tools,
-        OllamaConfiguration config,
+        IOptions<OllamaConfiguration> configOptions,
         ILogger<FeatureLookupAgent> logger)
     {
         _tools = tools ?? throw new ArgumentNullException(nameof(tools));
-        _config = config ?? throw new ArgumentNullException(nameof(config));
+        ArgumentNullException.ThrowIfNull(configOptions);
+        _config = configOptions.Value;
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
