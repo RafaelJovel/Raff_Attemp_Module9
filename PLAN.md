@@ -53,33 +53,105 @@ The recommended order of implementation is defined in [STEPS.md](STEPS.md). The 
 FeatureReadinessAssessment/
 ├── src/
 │   ├── FeatureAssessment.Core/           # Core domain models and interfaces
-│   │   ├── Models/
-│   │   ├── Interfaces/
+│   │   ├── Models/                       # Domain models, DTOs, state classes
+│   │   │   ├── FeatureMetadata.cs
+│   │   │   ├── AssessmentResult.cs
+│   │   │   ├── FeatureReadinessState.cs  # Workflow state
+│   │   │   ├── CriteriaAssessment.cs     # Assessment results
+│   │   │   └── CriterionResult.cs
+│   │   ├── Interfaces/                   # Agent and tool interfaces
+│   │   │   ├── IFeatureLookupAgent.cs
+│   │   │   ├── ICoordinatorAgent.cs
+│   │   │   ├── IDocumentationTool.cs
+│   │   │   └── IMetricsTool.cs
 │   │   └── FeatureAssessment.Core.csproj
 │   ├── FeatureAssessment.Agents/         # Agent implementations
-│   │   ├── Lookup/
-│   │   ├── Coordinator/
-│   │   ├── Specialists/
+│   │   ├── Lookup/                       # Feature lookup agent
+│   │   │   ├── FeatureLookupAgent.cs
+│   │   │   └── FeatureLookupResult.cs
+│   │   ├── Coordinator/                  # Coordinator (supervisor) agent
+│   │   │   ├── CoordinatorAgent.cs
+│   │   │   └── DecisionFramework.cs
+│   │   ├── Specialists/                  # Specialist agents
+│   │   │   ├── DocumentationSpecialist.cs
+│   │   │   ├── MetricsSpecialist.cs
+│   │   │   └── ReviewsSpecialist.cs
 │   │   └── FeatureAssessment.Agents.csproj
 │   ├── FeatureAssessment.Tools/          # Tool implementations
-│   │   ├── Documentation/
-│   │   ├── Metrics/
-│   │   ├── Reviews/
+│   │   ├── Documentation/                # Documentation assessment tools
+│   │   │   ├── ListPlanningDocsTool.cs
+│   │   │   └── ReadPlanningDocTool.cs
+│   │   ├── Metrics/                      # Metrics retrieval tools
+│   │   │   ├── GetTestCoverageTool.cs
+│   │   │   ├── GetTestResultsTool.cs
+│   │   │   ├── GetSecurityScanTool.cs
+│   │   │   └── GetPerformanceMetricsTool.cs
+│   │   ├── Reviews/                      # Review status tools
+│   │   │   └── GetReviewStatusTool.cs
 │   │   └── FeatureAssessment.Tools.csproj
 │   └── FeatureAssessment.Infrastructure/ # Infrastructure concerns
-│       ├── LLM/
-│       ├── Telemetry/
+│       ├── LLM/                          # LLM integration
+│       │   ├── OpenRouterClient.cs
+│       │   └── SemanticKernelSetup.cs
+│       ├── Configuration/                # Configuration classes
+│       │   ├── LLMOptions.cs
+│       │   ├── AssessmentOptions.cs
+│       │   └── Validators/
+│       │       ├── LLMOptionsValidator.cs
+│       │       └── AssessmentOptionsValidator.cs
+│       ├── Telemetry/                    # Observability
+│       │   ├── OpenTelemetrySetup.cs
+│       │   └── LoggingExtensions.cs
 │       └── FeatureAssessment.Infrastructure.csproj
 ├── tests/
 │   ├── FeatureAssessment.Core.Tests/
+│   │   ├── Models/
+│   │   └── FeatureAssessment.Core.Tests.csproj
 │   ├── FeatureAssessment.Agents.Tests/
+│   │   ├── Lookup/
+│   │   │   └── FeatureLookupAgentTests.cs
+│   │   ├── Coordinator/
+│   │   │   └── CoordinatorAgentTests.cs
+│   │   └── FeatureAssessment.Agents.Tests.csproj
 │   ├── FeatureAssessment.Tools.Tests/
+│   │   ├── Documentation/
+│   │   ├── Metrics/
+│   │   └── FeatureAssessment.Tools.Tests.csproj
 │   └── FeatureAssessment.IntegrationTests/
+│       ├── EndToEnd/
+│       │   └── FullAssessmentWorkflowTests.cs
+│       └── FeatureAssessment.IntegrationTests.csproj
 ├── data/                                  # Sample data (not part of solution)
 │   └── incoming/
+│       ├── feature1/
+│       ├── feature2/
+│       ├── feature3/
+│       └── feature4/
 ├── FeatureReadinessAssessment.sln
 └── global.json                            # Pin .NET SDK version
 ```
+
+### Project Structure Details
+
+**State Management Location:**
+- State classes (`FeatureReadinessState`, `CriteriaAssessment`, `CriterionResult`) reside in **`FeatureAssessment.Core/Models/`**
+- These are domain models that represent workflow state and assessment results
+- Enums like `DecisionType`, `CriterionStatus`, `TargetEnvironment` also go in `Core/Models/`
+
+**Infrastructure Subdirectories:**
+- **`LLM/`** - LLM client integration, Semantic Kernel setup
+- **`Configuration/`** - Strongly-typed configuration classes and validators
+- **`Telemetry/`** - OpenTelemetry setup, logging extensions, observability
+
+**File Organization Guidelines:**
+- **Create subdirectories when:**
+  - You have 3+ related files (e.g., multiple tools of the same type)
+  - Files represent a logical grouping (e.g., all metrics tools)
+  - You want to mirror the project structure in tests
+- **Keep flat when:**
+  - Only 1-2 files in a category
+  - Files are utilities or shared infrastructure
+- **Example:** If Coordinator agent needs multiple helper classes, create `Coordinator/Helpers/` subdirectory
 
 ## Key .NET Packages
 
@@ -143,10 +215,41 @@ dotnet sln add src/**/*.csproj
 dotnet sln add tests/**/*.csproj
 
 # Add project references
+# Source projects reference Core
 dotnet add src/FeatureAssessment.Agents reference src/FeatureAssessment.Core
 dotnet add src/FeatureAssessment.Tools reference src/FeatureAssessment.Core
+dotnet add src/FeatureAssessment.Infrastructure reference src/FeatureAssessment.Core
+
+# Agents may need Infrastructure (for LLM client)
+dotnet add src/FeatureAssessment.Agents reference src/FeatureAssessment.Infrastructure
+
+# Test projects reference their source projects
 dotnet add tests/FeatureAssessment.Core.Tests reference src/FeatureAssessment.Core
-# ... and so on
+dotnet add tests/FeatureAssessment.Agents.Tests reference src/FeatureAssessment.Agents
+dotnet add tests/FeatureAssessment.Agents.Tests reference src/FeatureAssessment.Core
+dotnet add tests/FeatureAssessment.Tools.Tests reference src/FeatureAssessment.Tools
+dotnet add tests/FeatureAssessment.Tools.Tests reference src/FeatureAssessment.Core
+
+# Integration tests reference all projects
+dotnet add tests/FeatureAssessment.IntegrationTests reference src/FeatureAssessment.Core
+dotnet add tests/FeatureAssessment.IntegrationTests reference src/FeatureAssessment.Agents
+dotnet add tests/FeatureAssessment.IntegrationTests reference src/FeatureAssessment.Tools
+dotnet add tests/FeatureAssessment.IntegrationTests reference src/FeatureAssessment.Infrastructure
+```
+
+**Project Dependency Graph:**
+```
+FeatureAssessment.Core (no dependencies)
+   ↑
+   ├─ FeatureAssessment.Infrastructure
+   ├─ FeatureAssessment.Agents → FeatureAssessment.Infrastructure
+   └─ FeatureAssessment.Tools
+
+Tests:
+- Core.Tests → Core
+- Agents.Tests → Agents, Core
+- Tools.Tests → Tools, Core
+- IntegrationTests → Core, Agents, Tools, Infrastructure
 ```
 
 ### Adding Packages
@@ -202,6 +305,28 @@ dotnet clean
 - **Records**: `FeatureMetadata`, `AssessmentResult`
 - **Test classes**: `FeatureLookupAgentTests`, `DocumentationToolTests`
 - **Test methods**: `ShouldReturnFeatureMetadata_WhenJiraKeyIsValid()`
+
+### Namespace Hierarchy
+
+| Project | Namespace | Purpose | Example Classes |
+|---------|-----------|---------|-----------------|
+| **FeatureAssessment.Core** | `FeatureAssessment.Core.Models` | Domain models, DTOs, state | `FeatureMetadata`, `FeatureReadinessState`, `AssessmentResult` |
+| | `FeatureAssessment.Core.Interfaces` | Agent and tool interfaces | `IFeatureLookupAgent`, `ICoordinatorAgent`, `IDocumentationTool` |
+| **FeatureAssessment.Agents** | `FeatureAssessment.Agents.Lookup` | Feature lookup agent | `FeatureLookupAgent`, `FeatureLookupResult` |
+| | `FeatureAssessment.Agents.Coordinator` | Coordinator/supervisor agent | `CoordinatorAgent`, `DecisionFramework` |
+| | `FeatureAssessment.Agents.Specialists` | Specialist agents | `DocumentationSpecialist`, `MetricsSpecialist`, `ReviewsSpecialist` |
+| **FeatureAssessment.Tools** | `FeatureAssessment.Tools.Documentation` | Documentation tools | `ListPlanningDocsTool`, `ReadPlanningDocTool` |
+| | `FeatureAssessment.Tools.Metrics` | Metrics retrieval tools | `GetTestCoverageTool`, `GetSecurityScanTool` |
+| | `FeatureAssessment.Tools.Reviews` | Review status tools | `GetReviewStatusTool` |
+| **FeatureAssessment.Infrastructure** | `FeatureAssessment.Infrastructure.LLM` | LLM client integration | `OpenRouterClient`, `SemanticKernelSetup` |
+| | `FeatureAssessment.Infrastructure.Configuration` | Configuration classes | `LLMOptions`, `AssessmentOptions`, validators |
+| | `FeatureAssessment.Infrastructure.Telemetry` | Observability setup | `OpenTelemetrySetup`, `LoggingExtensions` |
+| **Test Projects** | `FeatureAssessment.{Project}.Tests` | Test namespaces mirror source | `FeatureAssessment.Agents.Tests.Lookup.FeatureLookupAgentTests` |
+
+**Namespace Conventions:**
+- Use file-scoped namespaces: `namespace FeatureAssessment.Core.Models;`
+- Match folder structure: `src/FeatureAssessment.Agents/Lookup/` → `namespace FeatureAssessment.Agents.Lookup;`
+- Test namespaces mirror source: `FeatureAssessment.Agents.Lookup.FeatureLookupAgent` → `FeatureAssessment.Agents.Tests.Lookup.FeatureLookupAgentTests`
 
 ### Modern C# Features to Use
 - **File-scoped namespaces**: `namespace FeatureAssessment.Core;`
