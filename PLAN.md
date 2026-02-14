@@ -37,7 +37,7 @@ The recommended order of implementation is defined in [STEPS.md](STEPS.md). The 
 
 - **.NET 10** with C# 13 and async/await (Task-based)
 - **dotnet CLI** for project and dependency management
-- **OpenRouter** as the LLM provider
+- **Ollama with Qwen2.5** as the LLM provider (localhost:11434 in Docker)
 - **Microsoft Semantic Kernel** as the agentic framework
 - **HttpClient** (built-in) for HTTP client with IHttpClientFactory
 - **OpenTelemetry .NET** for traces and metrics
