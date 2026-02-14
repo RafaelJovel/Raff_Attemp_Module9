@@ -111,7 +111,9 @@ dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.Logging.Abstr
 - API: OpenAI-compatible (use Semantic Kernel's OpenAI connector with custom endpoint)
 
 ### Task 3: State Management, Configuration, & Resilience
-**Status**: 🔵 IN PROGRESS (COMMIT & PICK NEXT)
+**Status**: ✅ COMPLETED
+
+**Commit**: `0caab82` - feat: implement state management, configuration, and resilience (Task 3)
 
 **Acceptance Criteria:**
 
@@ -353,7 +355,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package WireMock.Net
 - Provide Docker Compose example for local development
 
 ### Task 4: Observability & Tracing + Integration Test Fixes
-**Status**: ⚪ NOT STARTED
+**Status**: 🔵 IN PROGRESS (PLAN)
 
 **Acceptance Criteria:**
 

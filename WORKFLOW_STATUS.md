@@ -313,8 +313,8 @@ The assistant MUST update this "Current Status" section BEFORE taking any action
 
 ### Active Work Item
 - **Work Item File**: `changes/workitem002.md` - Create the Feature Lookup Agent
-- **Current Task**: Task 3 - State Management, Configuration, & Resilience
-- **Current Stage**: COMMIT & PICK NEXT
+- **Current Task**: Task 4 - Observability & Tracing + Integration Test Fixes
+- **Current Stage**: PLAN
 - **Last Updated**: 2026-02-14
 
 ### When Active
