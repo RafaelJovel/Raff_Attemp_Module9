@@ -404,6 +404,268 @@ dotnet add tests/FeatureAssessment.Core.Tests package WireMock.Net
 3. Un-ignore integration tests in `OllamaConnectivityTests.cs` (lines 71, 109)
 4. Verify tests pass with corrected configuration
 
+#### Test Strategy
+
+**Acceptance Criterion 1: Trace Context Initialization**
+
+**Unit Tests (Tracing Behavior):**
+1. Test Activity creation when agent executes
+   - Input: Mock agent execution
+   - Expected: Activity with name "FeatureLookupAgent.LookupFeature" is created
+   - Verify: Activity.Current is set and has correct operation name
+
+2. Test span hierarchy for tool calls
+   - Input: Agent calls tools during execution
+   - Expected: Child spans created for each tool invocation
+   - Verify: Parent-child relationship preserved (tool spans nested under agent span)
+
+3. Test trace attributes/tags are set
+   - Input: Agent execution with query "Is PLAT-1523 ready?"
+   - Expected: Span tags include: query text, feature_key, target_environment
+   - Verify: Tags are properly attached to Activity
+
+4. Test Activity propagation through async calls
+   - Input: Async agent execution with multiple awaits
+   - Expected: Activity.Current is maintained across async boundaries
+   - Verify: Trace context not lost during async operations
+
+5. Test error recording in spans
+   - Input: Agent encounters error (feature not found)
+   - Expected: Span marked with error status and exception details
+   - Verify: Activity.SetStatus(ActivityStatusCode.Error) called
+
+**Integration Tests (Observability):**
+6. Test end-to-end trace with real Ollama
+   - Input: Full agent execution with real LLM
+   - Expected: Complete trace hierarchy visible (agent → LLM call → tool calls)
+   - Verify: All operations captured in trace
+   - Mark with `[TestCategory("Integration")]`
+
+**Manual Verification:**
+7. Run agent with trace exporter configured
+   - Use console exporter or OTLP exporter
+   - Verify trace output shows complete execution flow
+   - Verify spans include timing information
+
+**Acceptance Criterion 2: Fix Integration Tests**
+
+**Configuration Fix Validation:**
+8. Test OllamaConfiguration with corrected defaults
+   - Input: Default configuration (no overrides)
+   - Expected: Endpoint = "http://localhost:11434/v1", ModelName = "qwen2.5:0.5b"
+   - Verify: Configuration validator accepts new defaults
+
+**Integration Tests (Previously Failing):**
+9. Un-ignore and run `FeatureLookupAgent_CanConnectToOllama`
+   - Input: Query "Is PLAT-1523 ready for production?"
+   - Expected: Agent successfully calls mock tools
+   - Verify: Tools invoked at least once, no connection errors
+
+10. Un-ignore and run `FeatureLookupAgent_WithRealTools_CanIdentifyFeature`
+    - Input: Query with real file system tools
+    - Expected: Agent returns `IsSuccess = true` with feature identified
+    - Verify: Feature lookup succeeds, correct feature metadata returned
+
+11. Test OllamaEndToEndTests with corrected configuration
+    - Input: End-to-end test with real Ollama
+    - Expected: All integration tests pass
+    - Verify: No timeout, connection, or model-not-found errors
+
+**Regression Tests:**
+12. Verify existing unit tests still pass
+    - Run all unit tests (excluding integration)
+    - Expected: No regressions from configuration changes
+    - Verify: `dotnet test --filter "Category!=Integration"` passes
+
+#### File Changes
+
+**Package Dependencies:**
+```bash
+# Add OpenTelemetry packages for tracing
+dotnet add src/FeatureAssessment.Core package OpenTelemetry
+dotnet add src/FeatureAssessment.Core package OpenTelemetry.Api
+dotnet add src/FeatureAssessment.Core package OpenTelemetry.Extensions.Hosting
+
+# For testing/debugging traces
+dotnet add tests/FeatureAssessment.Core.Tests package OpenTelemetry.Exporter.Console
+```
+
+**Modified Files:**
+
+1. **`src/FeatureAssessment.Core/Configuration/OllamaConfiguration.cs`** - Fix default configuration
+   ```csharp
+   // CHANGE LINE 18:
+   - public string Endpoint { get; set; } = "http://localhost:11434";
+   + public string Endpoint { get; set; } = "http://localhost:11434/v1";
+
+   // CHANGE LINE 24 (or thereabouts):
+   - public string ModelName { get; set; } = "qwen2.5:latest";
+   + public string ModelName { get; set; } = "qwen2.5:0.5b";
+   ```
+
+2. **`src/FeatureAssessment.Core/Agents/FeatureLookupAgent.cs`** - Add tracing
+   ```csharp
+   // Add ActivitySource field
+   private static readonly ActivitySource ActivitySource = new("FeatureAssessment.FeatureLookup");
+
+   // Wrap LookupFeatureAsync with Activity
+   public async Task<FeatureLookupResult> LookupFeatureAsync(string query, CancellationToken cancellationToken)
+   {
+       using var activity = ActivitySource.StartActivity("FeatureLookupAgent.LookupFeature");
+       activity?.SetTag("query", query);
+
+       try
+       {
+           // Existing logic...
+           activity?.SetTag("feature_key", result.FeatureKey);
+           activity?.SetTag("target_environment", result.TargetEnvironment);
+           return result;
+       }
+       catch (Exception ex)
+       {
+           activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+           throw;
+       }
+   }
+   ```
+
+3. **`tests/FeatureAssessment.Core.Tests/Integration/OllamaConnectivityTests.cs`** - Un-ignore tests
+   ```csharp
+   // REMOVE [Ignore] attributes from lines 71 and 109:
+   - [Ignore("Integration test - requires Ollama running")]
+   + // [Ignore] removed - configuration fixed
+   [TestMethod]
+   [TestCategory("Integration")]
+   public async Task FeatureLookupAgent_CanConnectToOllama()
+   ```
+
+**New Files:**
+
+4. **`src/FeatureAssessment.Core/Observability/ActivitySources.cs`** - Centralized ActivitySource
+   ```csharp
+   namespace FeatureAssessment.Core.Observability;
+
+   public static class ActivitySources
+   {
+       public const string ServiceName = "FeatureAssessment";
+
+       public static readonly ActivitySource FeatureLookup = new(
+           $"{ServiceName}.FeatureLookup",
+           version: "1.0.0"
+       );
+
+       public static readonly ActivitySource Tools = new(
+           $"{ServiceName}.Tools",
+           version: "1.0.0"
+       );
+   }
+   ```
+
+5. **`tests/FeatureAssessment.Core.Tests/Observability/FeatureLookupAgentTracingTests.cs`** - Tracing tests
+   ```csharp
+   [TestClass]
+   public class FeatureLookupAgentTracingTests
+   {
+       [TestMethod]
+       public async Task LookupFeatureAsync_CreatesActivity()
+       [TestMethod]
+       public async Task LookupFeatureAsync_SetsSpanAttributes()
+       [TestMethod]
+       public async Task LookupFeatureAsync_RecordsErrorOnFailure()
+       [TestMethod]
+       public async Task LookupFeatureAsync_PreservesActivityAcrossAsync()
+   }
+   ```
+
+6. **`tests/FeatureAssessment.Core.Tests/Integration/OllamaTracingEndToEndTests.cs`** - E2E trace test
+   ```csharp
+   [TestClass]
+   public class OllamaTracingEndToEndTests
+   {
+       [TestMethod]
+       [TestCategory("Integration")]
+       public async Task FeatureLookupAgent_WithTracing_GeneratesCompleteTrace()
+       {
+           // Setup ActivityListener to capture activities
+           // Execute agent with real Ollama
+           // Verify activity hierarchy and attributes
+       }
+   }
+   ```
+
+**Documentation Updates:**
+
+7. **`TESTING.md`** - Update with corrected configuration
+   ```markdown
+   ## Configuration
+
+   ### Ollama Setup
+   - **Endpoint**: `http://localhost:11434/v1` (note: `/v1` suffix required for OpenAI API compatibility)
+   - **Model**: `qwen2.5:0.5b` (or any available model - check with `ollama list`)
+   - **Installation**: See https://ollama.com/download
+   - **Pull Model**: `ollama pull qwen2.5:0.5b`
+
+   ### Running Integration Tests
+   ```bash
+   # Verify Ollama is running and model is available
+   curl http://localhost:11434/api/tags
+   curl -X POST http://localhost:11434/v1/chat/completions \
+     -H "Content-Type: application/json" \
+     -d '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"test"}]}'
+
+   # Run integration tests
+   dotnet test --filter "Category=Integration"
+   ```
+
+   ### Observability (NEW)
+
+   #### Viewing Traces
+   ```bash
+   # Run with console trace exporter for debugging
+   OTEL_DOTNET_EXPERIMENTAL_CONSOLE_EXPORTER_ENABLED=true dotnet test
+   ```
+   ```
+
+#### Technical Decisions
+
+**Tracing Strategy:**
+- Use System.Diagnostics.Activity (built-in .NET distributed tracing)
+- OpenTelemetry for standardization and interoperability
+- ActivitySource per component area (FeatureLookup, Tools, etc.)
+- Manual instrumentation (explicit span creation) for clarity
+- Console exporter for development, OTLP for production
+
+**Activity Naming Convention:**
+- Format: `{Component}.{Operation}` (e.g., "FeatureLookupAgent.LookupFeature")
+- Tool calls: "Tools.{ToolName}" (e.g., "Tools.ListAllFeatures")
+- Use descriptive operation names for observability
+
+**Span Attributes (Tags):**
+- `query`: Original user query
+- `feature_key`: Identified feature JIRA key
+- `feature_id`: Feature folder identifier
+- `target_environment`: UAT or Production
+- `is_success`: Boolean success indicator
+- `error.message`: Error details if failed
+
+**Configuration Fix Strategy:**
+- Change defaults in OllamaConfiguration.cs (breaking change, but justified)
+- Update documentation to reflect correct endpoint format
+- Provide troubleshooting guidance in TESTING.md
+- Consider adding configuration validation for `/v1` suffix
+
+**Testing Approach:**
+- Unit tests mock Activity creation (use ActivityListener)
+- Integration tests verify real trace generation with Ollama
+- Mark integration tests with `[TestCategory("Integration")]`
+- Manual verification with console exporter during development
+
+**Observability Foundation:**
+- This is the FIRST agent, so tracing setup here is critical
+- All future agents will follow same pattern
+- Coordinator Agent will inherit trace context from Feature Lookup Agent
+- Trace context propagates through entire assessment workflow
+
 ### Task 5: Manual Testing Harness
 **Status**: ⚪ NOT STARTED
 
