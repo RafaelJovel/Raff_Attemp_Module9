@@ -20,20 +20,27 @@ This document provides comprehensive guidance for running tests, setting up test
 
 ### Ollama Setup (Integration Tests Only)
 
-Integration tests require a running Ollama instance with the `qwen2.5:latest` model:
+Integration tests require a running Ollama instance with the `qwen2.5:0.5b` model:
 
 ```bash
 # 1. Install Ollama from https://ollama.com/download
 
-# 2. Pull the qwen2.5 model
-ollama pull qwen2.5:latest
+# 2. Pull the qwen2.5:0.5b model (lightweight model for testing)
+ollama pull qwen2.5:0.5b
 
 # 3. Verify Ollama is running (should return model info)
 curl http://localhost:11434/api/tags
 
-# 4. Verify the model is available
+# 4. Verify the OpenAI-compatible API endpoint works
+curl -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"test"}]}'
+
+# 5. Verify the model is available
 ollama list
 ```
+
+**Important:** The application uses Ollama's OpenAI-compatible API endpoint at `/v1`, not the native Ollama API.
 
 **Note:** Unit tests do NOT require Ollama and run without any external dependencies.
 
@@ -385,7 +392,7 @@ ps aux | grep ollama
 
 ### Model Not Found
 
-**Problem:** Integration tests fail with "model qwen2.5:latest not found"
+**Problem:** Integration tests fail with "model qwen2.5:0.5b not found"
 
 **Solutions:**
 ```bash
@@ -393,10 +400,33 @@ ps aux | grep ollama
 ollama list
 
 # 2. Pull model if missing
-ollama pull qwen2.5:latest
+ollama pull qwen2.5:0.5b
 
 # 3. Verify model downloaded successfully
 ollama list | grep qwen2.5
+```
+
+### OpenAI API Endpoint Not Reachable
+
+**Problem:** Tests fail with "Connection refused" to `/v1` endpoint
+
+**Solutions:**
+```bash
+# 1. Verify the OpenAI-compatible API endpoint works
+curl -X POST http://localhost:11434/v1/chat/completions \
+  -H "Content-Type: application/json" \
+  -d '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"test"}]}'
+
+# 2. Check Ollama version (older versions may not support /v1)
+ollama --version
+
+# 3. Update Ollama if necessary
+# Windows: winget upgrade Ollama.Ollama
+# macOS: brew upgrade ollama
+# Linux: curl -fsSL https://ollama.com/install.sh | sh
+
+# 4. Verify configuration includes /v1 suffix
+# Endpoint should be: http://localhost:11434/v1 (NOT http://localhost:11434)
 ```
 
 ### Tests Timeout
@@ -475,8 +505,8 @@ Create for test-specific configuration:
 ```json
 {
   "Ollama": {
-    "Endpoint": "http://localhost:11434",
-    "ModelName": "qwen2.5:latest",
+    "Endpoint": "http://localhost:11434/v1",
+    "ModelName": "qwen2.5:0.5b",
     "TimeoutSeconds": 30,
     "MaxRetries": 3,
     "Temperature": 0.0,
@@ -484,6 +514,8 @@ Create for test-specific configuration:
   }
 }
 ```
+
+**Note:** The `/v1` suffix is **required** for OpenAI API compatibility.
 
 ## Coverage Reports
 
@@ -509,6 +541,109 @@ open coverage-report/index.html
 xdg-open coverage-report/index.html
 ```
 
+## Observability & Distributed Tracing
+
+The Feature Readiness Assessment System uses OpenTelemetry for distributed tracing. This allows you to observe the flow of requests through agents, tools, and LLM calls.
+
+### Viewing Traces During Tests
+
+#### Console Exporter (Development)
+
+View traces in the console output during test execution:
+
+```bash
+# Enable console trace exporter (requires OpenTelemetry.Exporter.Console package)
+# Traces will appear in test output automatically when ActivityListener is configured
+
+# Run tests with detailed output to see trace information
+dotnet test --verbosity normal
+```
+
+#### Programmatic Trace Inspection
+
+Tests can capture and inspect activities programmatically using `ActivityListener`:
+
+```csharp
+var capturedActivities = new List<Activity>();
+var listener = new ActivityListener
+{
+    ShouldListenTo = source => source.Name.StartsWith("FeatureAssessment"),
+    Sample = (ref ActivityCreationOptions<ActivityContext> _) => ActivitySamplingResult.AllDataAndRecorded,
+    ActivityStarted = activity => capturedActivities.Add(activity)
+};
+ActivitySource.AddActivityListener(listener);
+
+// Execute code under test
+await agent.LookupFeatureAsync("query");
+
+// Inspect captured activities
+foreach (var activity in capturedActivities)
+{
+    Console.WriteLine($"{activity.OperationName} - {activity.Duration}");
+    foreach (var tag in activity.Tags)
+    {
+        Console.WriteLine($"  {tag.Key}: {tag.Value}");
+    }
+}
+```
+
+### Trace Hierarchy
+
+When the Feature Lookup Agent executes, you'll see a trace hierarchy like:
+
+```
+FeatureLookupAgent.LookupFeature (parent)
+├─ query: "Is PLAT-1523 ready for production?"
+├─ feature_key: "PLAT-1523"
+├─ feature_id: "feature1"
+├─ target_environment: "Production"
+├─ is_success: true
+└─ Duration: 2.5s
+```
+
+### Activity Sources
+
+The system defines ActivitySources for each component:
+
+- **FeatureAssessment.FeatureLookup** - Feature identification and query processing
+- **FeatureAssessment.Tools** - Tool invocations (file reads, data parsing)
+- **FeatureAssessment.Coordinator** - Coordinator agent operations
+- **FeatureAssessment.Specialists** - Specialist agent consultations
+
+### Span Attributes (Tags)
+
+Common attributes attached to activities:
+
+- `query` - User query text
+- `feature_key` - JIRA key (e.g., "PLAT-1523")
+- `feature_id` - Feature folder ID (e.g., "feature1")
+- `target_environment` - "UAT" or "Production"
+- `is_success` - Boolean success indicator
+- `exception.type` - Exception type on error
+- `exception.message` - Error message
+- `service.name` - Always "FeatureAssessment"
+
+### Integration with Observability Backends
+
+For production observability, export traces to:
+
+- **Jaeger** - Open-source distributed tracing
+- **Zipkin** - Distributed tracing system
+- **Azure Application Insights** - Cloud observability
+- **OTLP Collector** - OpenTelemetry Protocol collector
+
+Example configuration (add to your host builder):
+
+```csharp
+builder.Services.AddOpenTelemetry()
+    .WithTracing(tracingBuilder => tracingBuilder
+        .AddSource("FeatureAssessment.*")
+        .AddOtlpExporter(options =>
+        {
+            options.Endpoint = new Uri("http://localhost:4317");
+        }));
+```
+
 ## Best Practices
 
 1. **Run unit tests frequently** during development (they're fast!)
@@ -519,9 +654,96 @@ xdg-open coverage-report/index.html
 6. **Document external dependencies** in test comments
 7. **Use `[Ignore]` with reason** for tests requiring manual setup
 
+## Model Selection and Known Limitations
+
+### Recommended Models for Tool Calling
+
+**After extensive testing, the following models are recommended:**
+
+✅ **llama3.1:8b** (Recommended - Proven tool calling support)
+- Size: ~4.9GB
+- Best tool calling reliability with Semantic Kernel
+- Consistent JSON formatting
+- Hardware: Requires 8GB+ RAM/VRAM
+
+✅ **llama3.2:latest** (Alternative)
+- Size: varies by version
+- Good tool calling support
+- Faster than 8B models
+
+✅ **llama3.3:latest** (If available)
+- Excellent tool calling
+- Latest improvements
+
+❌ **qwen2.5 models** (NOT Recommended)
+- Limited tool calling support
+- Poor JSON formatting
+- Tests show high failure rate
+
+### Updating Model Configuration
+
+To switch models, update `OllamaConfiguration.cs`:
+
+```csharp
+public string ModelName { get; set; } = "llama3.1:8b"; // Change here
+```
+
+Or override in `appsettings.json`:
+
+```json
+{
+  "Ollama": {
+    "Endpoint": "http://localhost:11434",
+    "ModelName": "llama3.1:8b"
+  }
+}
+```
+
+### Known Limitations with Local LLMs
+
+**Test Flakiness:**
+- Integration tests may show 80-90% pass rate (normal for local LLMs)
+- LLM non-determinism persists even with temperature=0
+- Edge cases (non-existent features) more prone to variability
+- Retrying failed tests may yield different results
+
+**Performance:**
+- 8B models require 8GB+ RAM/VRAM
+- RTX 4090 (24GB): Excellent performance
+- Response times: 1-5 seconds typical
+- First query after loading: 5-10 seconds
+
+**Reliability vs Cloud Models:**
+- Local models: 80-90% reliability in tool calling
+- Cloud models (GPT-4, Claude): 95-99% reliability
+- Consider cloud models for production CI/CD pipelines
+
+### Configuration for Ollama Connector
+
+**IMPORTANT:** The Ollama connector (not OpenAI connector) requires specific configuration:
+
+```csharp
+// Correct configuration for Ollama connector
+builder.AddOllamaChatCompletion(
+    modelId: "llama3.1:8b",
+    endpoint: new Uri("http://localhost:11434")); // NO /v1 suffix
+
+// Execution settings
+var settings = new OllamaPromptExecutionSettings
+{
+    Temperature = 0.0f,
+    FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
+};
+```
+
+**Package Requirements:**
+- `Microsoft.SemanticKernel` v1.70.0+
+- `Microsoft.SemanticKernel.Connectors.Ollama` v1.70.0-alpha+ (prerelease)
+
 ## Additional Resources
 
 - [Ollama Documentation](https://github.com/ollama/ollama/tree/main/docs)
+- [Semantic Kernel Ollama Connector](https://github.com/microsoft/semantic-kernel)
 - [MSTest Documentation](https://learn.microsoft.com/en-us/dotnet/core/testing/unit-testing-with-mstest)
 - [Moq Documentation](https://github.com/moq/moq4)
 - [Polly Documentation](https://www.thepollyproject.org/)

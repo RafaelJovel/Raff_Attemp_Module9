@@ -1,5 +1,7 @@
+using System.ComponentModel;
 using System.Text.Json;
 using FeatureAssessment.Core.Models;
+using Microsoft.SemanticKernel;
 
 namespace FeatureAssessment.Core.Tools;
 
@@ -19,6 +21,8 @@ public class FeatureLookupTools : IFeatureLookupTools
         _dataDirectory = dataDirectory ?? throw new ArgumentNullException(nameof(dataDirectory));
     }
 
+    [KernelFunction("list_all_features")]
+    [Description("Lists all available features with their basic metadata (ID, JIRA key, summary, status)")]
     public async Task<IReadOnlyList<FeatureInfo>> ListAllFeaturesAsync()
     {
         var incomingDirectory = Path.Combine(_dataDirectory, "incoming");
@@ -63,7 +67,10 @@ public class FeatureLookupTools : IFeatureLookupTools
         return features;
     }
 
-    public async Task<FeatureMetadata> GetFeatureMetadataAsync(string featureIdentifier)
+    [KernelFunction("get_feature_metadata")]
+    [Description("Retrieves detailed metadata for a specific feature by JIRA key (e.g., PLAT-1523), feature ID (e.g., feature1), or feature name")]
+    public async Task<FeatureMetadata> GetFeatureMetadataAsync(
+        [Description("The feature identifier: JIRA key, feature ID, or feature name")] string featureIdentifier)
     {
         if (string.IsNullOrWhiteSpace(featureIdentifier))
         {

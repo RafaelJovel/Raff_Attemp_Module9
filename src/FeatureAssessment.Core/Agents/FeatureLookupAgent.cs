@@ -1,13 +1,15 @@
+using System.Diagnostics;
 using System.Text.Json;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Models;
+using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Prompts;
 using FeatureAssessment.Core.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.OpenAI;
+using Microsoft.SemanticKernel.Connectors.Ollama;
 
 namespace FeatureAssessment.Core.Agents;
 
@@ -39,6 +41,11 @@ public class FeatureLookupAgent : IFeatureLookupAgent
             throw new ArgumentException("Query cannot be null or whitespace.", nameof(query));
         }
 
+        // Create activity for distributed tracing
+        using var activity = ActivitySources.FeatureLookup.StartActivity("FeatureLookupAgent.LookupFeature");
+        activity?.SetTag("query", query);
+        activity?.SetTag("service.name", ActivitySources.ServiceName);
+
         _logger.LogInformation("Starting feature lookup for query: {Query}", query);
 
         try
@@ -52,6 +59,17 @@ public class FeatureLookupAgent : IFeatureLookupAgent
             // Parse response
             var result = ParseResponse(response);
 
+            // Add result attributes to activity
+            activity?.SetTag("feature_key", result.FeatureKey);
+            activity?.SetTag("feature_id", result.FeatureId);
+            activity?.SetTag("target_environment", result.TargetEnvironment);
+            activity?.SetTag("is_success", result.IsSuccess);
+
+            if (!result.IsSuccess && !string.IsNullOrEmpty(result.ErrorMessage))
+            {
+                activity?.SetStatus(ActivityStatusCode.Error, result.ErrorMessage);
+            }
+
             _logger.LogInformation(
                 "Feature lookup completed. Success: {Success}, FeatureKey: {FeatureKey}",
                 result.IsSuccess,
@@ -62,6 +80,13 @@ public class FeatureLookupAgent : IFeatureLookupAgent
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error during feature lookup for query: {Query}", query);
+
+            // Record exception in activity
+            activity?.SetStatus(ActivityStatusCode.Error, ex.Message);
+            activity?.SetTag("exception.type", ex.GetType().FullName);
+            activity?.SetTag("exception.message", ex.Message);
+            activity?.SetTag("exception.stacktrace", ex.StackTrace);
+
             return new FeatureLookupResult
             {
                 IsSuccess = false,
@@ -74,11 +99,10 @@ public class FeatureLookupAgent : IFeatureLookupAgent
     {
         var builder = Kernel.CreateBuilder();
 
-        // Configure Ollama using OpenAI connector with custom endpoint
-        builder.AddOpenAIChatCompletion(
+        // Configure Ollama using dedicated Ollama connector for function calling support
+        builder.AddOllamaChatCompletion(
             modelId: _config.ModelName,
-            endpoint: new Uri(_config.Endpoint),
-            apiKey: "not-needed"); // Ollama doesn't require an API key
+            endpoint: new Uri(_config.Endpoint.Replace("/v1", ""))); // Ollama connector doesn't need /v1 suffix
 
         // Register feature lookup tools as a plugin
         builder.Plugins.AddFromObject(_tools, "FeatureLookup");
@@ -95,11 +119,10 @@ public class FeatureLookupAgent : IFeatureLookupAgent
         chatHistory.AddUserMessage(query);
 
         // Execute with automatic function calling enabled
-        var executionSettings = new OpenAIPromptExecutionSettings
+        var executionSettings = new OllamaPromptExecutionSettings
         {
-            Temperature = _config.Temperature,
-            MaxTokens = _config.MaxTokens,
-            ToolCallBehavior = ToolCallBehavior.AutoInvokeKernelFunctions
+            Temperature = (float)_config.Temperature,
+            FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
         };
 
         _logger.LogDebug("Executing agent with automatic tool calling enabled");

@@ -19,9 +19,9 @@ public class OllamaConfiguration
 
     /// <summary>
     /// The model name to use for chat completion.
-    /// Default: qwen2.5:latest
+    /// Default: llama3.1:8b (proven tool calling support with Semantic Kernel)
     /// </summary>
-    public string ModelName { get; set; } = "qwen2.5:latest";
+    public string ModelName { get; set; } = "llama3.1:8b";
 
     /// <summary>
     /// Temperature setting for LLM responses (0.0 to 1.0).

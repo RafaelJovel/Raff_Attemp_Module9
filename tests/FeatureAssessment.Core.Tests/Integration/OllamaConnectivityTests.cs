@@ -13,7 +13,7 @@ namespace FeatureAssessment.Core.Tests.Integration;
 public class OllamaConnectivityTests
 {
     private const string OllamaEndpoint = "http://localhost:11434";
-    private const string ModelName = "qwen2.5:0.5b";
+    private const string ModelName = "llama3.1:8b";
 
     [TestMethod]
     public async Task OllamaEndpoint_IsReachable()
@@ -68,7 +68,6 @@ public class OllamaConnectivityTests
     }
 
     [TestMethod]
-    [Ignore("Configuration fix required - see Task 4 in workitem002.md")]
     public async Task FeatureLookupAgent_CanConnectToOllama()
     {
         // Arrange
@@ -76,7 +75,7 @@ public class OllamaConnectivityTests
         var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
         var config = new OllamaConfiguration
         {
-            Endpoint = OllamaEndpoint,
+            Endpoint = OllamaEndpoint, // Ollama connector doesn't need /v1 suffix
             ModelName = ModelName,
             Temperature = 0.0,
             MaxTokens = 100,
@@ -106,7 +105,6 @@ public class OllamaConnectivityTests
     }
 
     [TestMethod]
-    [Ignore("Configuration fix required - see Task 4 in workitem002.md")]
     public async Task FeatureLookupAgent_WithRealTools_CanIdentifyFeature()
     {
         // Arrange
@@ -115,7 +113,7 @@ public class OllamaConnectivityTests
         var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
         var config = new OllamaConfiguration
         {
-            Endpoint = OllamaEndpoint,
+            Endpoint = OllamaEndpoint, // Ollama connector doesn't need /v1 suffix
             ModelName = ModelName,
             Temperature = 0.0,
             MaxTokens = 500,
