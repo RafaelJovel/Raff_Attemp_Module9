@@ -701,7 +701,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package OpenTelemetry.Exporter.Con
 - Trace context propagates through entire assessment workflow
 
 ### Task 5: Manual Testing Harness
-**Status**: ⚪ NOT STARTED
+**Status**: 🔵 IN PROGRESS (PLAN stage)
 
 **Acceptance Criteria:**
 
@@ -745,6 +745,123 @@ The manual testing harness must include documentation of:
 - Verbose output showing tool calls and trace context
 - Error handling and retry logic
 - Configuration display (model, endpoint, settings)
+
+#### Test Strategy
+
+**What We Need to Demonstrate:**
+
+1. **Basic Feature Identification**
+   - Query with JIRA key: "Is PLAT-1523 ready for production?"
+   - Query with feature name: "Check maintenance scheduling for UAT"
+   - Query without environment: "Tell me about the QR code feature"
+
+2. **Environment Extraction**
+   - Production target: "Is feature X ready for production?"
+   - UAT target: "Can we deploy feature Y to UAT?"
+   - Default behavior: "What's the status of feature Z?"
+
+3. **Error Handling**
+   - Non-existent feature: "Is feature XYZ-9999 ready?"
+   - Ambiguous query: "What about the feature?"
+   - Empty/invalid input
+
+4. **Tool Calling Visibility**
+   - Show when `list_all_features()` is called
+   - Show when `get_feature_metadata()` is called
+   - Display tool parameters and results
+
+5. **Trace Context Display**
+   - Show Activity/span creation
+   - Display span attributes (query, feature_key, target_environment)
+   - Show execution timing
+
+6. **Configuration Display**
+   - Show current Ollama endpoint
+   - Show model being used
+   - Show timeout and retry settings
+
+**Validation Approach:**
+- User runs harness and verifies output matches expected behavior
+- Documentation explains what "good" looks like
+- Troubleshooting guide helps diagnose issues
+- Sample outputs provided for reference
+
+#### File Changes
+
+**New Console Application Project:**
+
+1. **`tests/FeatureAssessment.TestHarness/FeatureAssessment.TestHarness.csproj`**
+   - New console app project
+   - References `src/FeatureAssessment.Core`
+   - Packages: OpenTelemetry exporters, Microsoft.Extensions.Hosting
+
+2. **`tests/FeatureAssessment.TestHarness/Program.cs`**
+   - Main entry point
+   - Setup DI container with all services
+   - Configure OpenTelemetry with console exporter
+   - Run interactive console loop
+
+3. **`tests/FeatureAssessment.TestHarness/TestScenarios.cs`**
+   - Pre-defined test queries grouped by scenario
+   - Expected behavior documentation for each
+   - Sample output examples
+
+4. **`tests/FeatureAssessment.TestHarness/ConsoleOutputHelper.cs`**
+   - Pretty-print results with colors (if supported)
+   - Format tool calls and traces
+   - Display configuration info
+   - Show timing information
+
+5. **`tests/FeatureAssessment.TestHarness/appsettings.json`**
+   - Ollama configuration specific to test harness
+   - Can override defaults for testing
+   - Includes verbose logging settings
+
+**Documentation Updates:**
+
+6. **`TESTING.md`** (update existing)
+   - Add "Manual Testing Harness" section
+   - Instructions for running the harness
+   - Expected output examples
+   - Troubleshooting guide from Task 4 requirements
+
+7. **`tests/FeatureAssessment.TestHarness/README.md`**
+   - Detailed harness usage guide
+   - Sample session walkthrough
+   - Interpreting results
+   - Model recommendations and known limitations
+
+**Package Dependencies:**
+```bash
+# Create new console app project
+dotnet new console -n FeatureAssessment.TestHarness -o tests/FeatureAssessment.TestHarness
+
+# Add to solution
+dotnet sln add tests/FeatureAssessment.TestHarness/FeatureAssessment.TestHarness.csproj
+
+# Add project reference
+dotnet add tests/FeatureAssessment.TestHarness reference src/FeatureAssessment.Core
+
+# Add packages
+dotnet add tests/FeatureAssessment.TestHarness package Microsoft.Extensions.Hosting
+dotnet add tests/FeatureAssessment.TestHarness package Microsoft.Extensions.Configuration.Json
+dotnet add tests/FeatureAssessment.TestHarness package Microsoft.Extensions.DependencyInjection
+dotnet add tests/FeatureAssessment.TestHarness package OpenTelemetry.Exporter.Console
+dotnet add tests/FeatureAssessment.TestHarness package Spectre.Console  # Optional: for fancy console UI
+```
+
+**Success Criteria:**
+
+1. ✅ User can run: `dotnet run --project tests/FeatureAssessment.TestHarness`
+2. ✅ Harness displays current configuration (endpoint, model, settings)
+3. ✅ Pre-defined scenarios execute and show expected output
+4. ✅ Interactive mode allows custom queries
+5. ✅ Tool calls are visible in output
+6. ✅ Trace information is displayed
+7. ✅ Documentation includes all required sections (model requirements, expected behavior, troubleshooting)
+8. ✅ README.md in harness directory with usage examples
+9. ✅ TESTING.md updated with harness instructions
+10. ✅ User can manually verify agent behavior matches documentation
 
 ### Notes
  What to Build
