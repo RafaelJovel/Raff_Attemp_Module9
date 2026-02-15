@@ -740,6 +740,123 @@ var settings = new OllamaPromptExecutionSettings
 - `Microsoft.SemanticKernel` v1.70.0+
 - `Microsoft.SemanticKernel.Connectors.Ollama` v1.70.0-alpha+ (prerelease)
 
+## Manual Testing Harness
+
+In addition to automated tests, the project includes an interactive **Manual Testing Harness** for hands-on validation of the Feature Lookup Agent.
+
+### What is the Manual Testing Harness?
+
+A standalone console application that allows you to:
+- Test the Feature Lookup Agent interactively
+- Run pre-defined test scenarios
+- Enter custom queries and see results in real-time
+- View trace information and tool calls
+- Validate agent behavior manually
+
+**Location:** `tests/FeatureAssessment.TestHarness/`
+
+### Running the Harness
+
+```bash
+# From repository root
+cd tests/FeatureAssessment.TestHarness
+dotnet run
+
+# Or directly from root
+dotnet run --project tests/FeatureAssessment.TestHarness
+```
+
+### Features
+
+1. **Run All Scenarios** - Execute 14 pre-defined test scenarios
+2. **Run by Category** - Choose a specific category (Happy Path, Error Handling, etc.)
+3. **Run Single Scenario** - Pick one specific scenario to test
+4. **Custom Query** - Enter your own natural language query
+5. **Show Configuration** - Display current Ollama settings
+
+### Pre-defined Test Scenarios
+
+The harness includes 14 scenarios across 5 categories:
+
+- **Happy Path** (3 scenarios) - Basic feature identification
+- **Environment Extraction** (3 scenarios) - Production vs UAT detection
+- **Error Handling** (3 scenarios) - Non-existent features, invalid input
+- **Tool Calling** (2 scenarios) - Verify tools are invoked correctly
+- **Edge Cases** (3 scenarios) - Partial names, case sensitivity, ambiguity
+
+### Example Output
+
+```
+  _____ _____    _  _____ _   _ ____  _____   _     ___   ___  _  ___   _ ____
+ |  ___| ____|  / \|_   _| | | |  _ \| ____| | |   / _ \ / _ \| |/ / | | |  _ \
+ | |_  |  _|   / _ \ | | | | | | |_) |  _|   | |  | | | | | | | ' /| | | | |_) |
+ |  _| | |___ / ___ \| | | |_| |  _ <| |___  | |__| |_| | |_| | . \| |_| |  __/
+ |_|   |_____/_/   \_\_|  \___/|_| \_\_____| |_____\___/ \___/|_|\_\\___/|_|
+
+Manual Testing Harness for Feature Lookup Agent
+
+┌─────────────────────────────────────────────┐
+│        Current Configuration                 │
+├───────────────────────┬─────────────────────┤
+│      Setting          │        Value        │
+├───────────────────────┼─────────────────────┤
+│ Ollama Endpoint       │ http://localhost... │
+│ Model Name            │ llama3.1:8b         │
+│ Timeout (seconds)     │ 60                  │
+│ Max Retries           │ 3                   │
+└───────────────────────┴─────────────────────┘
+
+What would you like to do?
+❯ Run all scenarios
+  Run scenarios by category
+  Run single scenario
+  Enter custom query
+  Show configuration
+  Exit
+```
+
+### Prerequisites for Manual Testing
+
+1. **Ollama running** - `ollama serve`
+2. **Model downloaded** - `ollama pull llama3.1:8b`
+3. **Sample data exists** - `data/incoming/feature1-4/` directories with JIRA metadata
+
+### Configuration
+
+The harness uses its own `appsettings.json`:
+
+```json
+{
+  "Ollama": {
+    "Endpoint": "http://localhost:11434",
+    "ModelName": "llama3.1:8b",
+    "TimeoutSeconds": 60,
+    "MaxRetries": 3
+  }
+}
+```
+
+### When to Use the Harness
+
+- **During development** - Quick validation of agent behavior
+- **After changes** - Verify modifications don't break existing functionality
+- **Demo purposes** - Show stakeholders how the agent works
+- **Debugging** - See tool calls and trace information in real-time
+- **Model testing** - Compare different LLM models (llama3.1 vs llama3.2, etc.)
+
+### Detailed Documentation
+
+For complete usage instructions, troubleshooting, and expected behavior documentation, see:
+
+**[tests/FeatureAssessment.TestHarness/README.md](../tests/FeatureAssessment.TestHarness/README.md)**
+
+This includes:
+- Model requirements and recommendations
+- Expected behavior with local LLMs
+- Interpreting results (success vs failure)
+- Troubleshooting common issues
+- Sample session walkthrough
+
 ## Additional Resources
 
 - [Ollama Documentation](https://github.com/ollama/ollama/tree/main/docs)

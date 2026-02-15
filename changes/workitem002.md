@@ -701,13 +701,15 @@ dotnet add tests/FeatureAssessment.Core.Tests package OpenTelemetry.Exporter.Con
 - Trace context propagates through entire assessment workflow
 
 ### Task 5: Manual Testing Harness
-**Status**: 🔵 IN PROGRESS (PLAN stage)
+**Status**: ✅ COMPLETED
 
 **Acceptance Criteria:**
 
 - **Given** the Feature Lookup Agent is implemented with llama3.1:8b
 - **When** the user runs the standalone test harness with sample queries
 - **Then** the agent can be manually verified through console output showing feature identification and environment extraction
+
+**Commit**: (pending) - feat: add manual testing harness for Feature Lookup Agent (Task 5)
 
 **Additional Requirements (from Task 4 Reflection):**
 
@@ -923,3 +925,337 @@ dotnet add tests/FeatureAssessment.TestHarness package Spectre.Console  # Option
 
 **Manual Verification by user:**
 Run the agent standalone with test queries and verify output makes sense.
+
+### Task 6: Anthropic LLM Support
+**Status**: ⚪ PENDING
+
+**Acceptance Criteria:**
+
+- **Given** the Feature Lookup Agent currently supports only Ollama (local LLM)
+- **When** the system is configured to use Anthropic as the LLM provider
+- **Then** the agent uses Claude Haiku 4.5 (or other Anthropic models) and all end-to-end tests pass
+
+**Goals:**
+1. Support Anthropic LLM as an alternative to Ollama
+2. Default to `claude-haiku-4-5` for production use
+3. All E2E tests pass with Anthropic LLM provider
+4. Configuration allows switching between Ollama (local) and Anthropic (cloud)
+
+#### Test Strategy
+
+**Unit Tests (Configuration & Provider Selection):**
+
+1. Test LLM provider configuration
+   - Input: Configuration with `LlmProvider="Anthropic"`
+   - Expected: Anthropic configuration is loaded and validated
+   - Verify: API key required, model defaults to `claude-haiku-4-5`
+
+2. Test provider switching logic
+   - Input: Configuration specifies different providers
+   - Expected: Correct LLM client is instantiated (Ollama vs Anthropic)
+   - Verify: Factory pattern or strategy pattern correctly selects provider
+
+3. Test Anthropic configuration validation
+   - Input: Missing API key, invalid model name
+   - Expected: Configuration validation fails with clear error messages
+   - Verify: `IValidateOptions<AnthropicConfiguration>` enforces requirements
+
+4. Test API key loading from environment variables
+   - Input: `ANTHROPIC_API_KEY` environment variable set
+   - Expected: Configuration loads API key securely
+   - Verify: No hardcoded keys, secrets not logged
+
+**Integration Tests (Anthropic E2E):**
+
+5. Test Feature Lookup Agent with Anthropic
+   - Input: Query "Is PLAT-1523 ready for production?"
+   - Expected: Agent uses Anthropic API, returns correct result
+   - Verify: Tool calling works with Claude models
+   - Mark with `[TestCategory("Integration")]`
+
+6. Test all existing scenarios with Anthropic provider
+   - Run same test scenarios as Task 2 (feature identification, environment extraction, error handling)
+   - Expected: All scenarios pass with Anthropic LLM
+   - Verify: Results are deterministic and accurate
+
+7. Test tool calling with Claude Haiku 4.5
+   - Input: Query requiring tool usage (fuzzy feature name match)
+   - Expected: Agent calls `list_all_features()` and `get_feature_metadata()` correctly
+   - Verify: Tool calling format compatible with Anthropic API
+
+8. Test tracing with Anthropic provider
+   - Input: Agent execution with tracing enabled
+   - Expected: Complete trace captured including Anthropic API calls
+   - Verify: Spans include provider metadata (model, tokens used)
+
+**Manual Testing Harness:**
+
+9. Update test harness to support both providers
+   - Add command-line flag to select provider (--provider=anthropic)
+   - Display current provider and model in output
+   - Test harness works with both Ollama and Anthropic
+
+**Regression Tests:**
+
+10. Verify Ollama tests still pass
+    - Run all existing Ollama integration tests
+    - Expected: No regressions from adding Anthropic support
+    - Verify: Ollama remains default for local development
+
+#### File Changes
+
+**Modified Files:**
+
+1. **`src/FeatureAssessment.Core/Configuration/OllamaConfiguration.cs`** → Rename to `LlmConfiguration.cs`
+   - Add `LlmProvider` enum (Ollama, Anthropic)
+   - Add provider selection property
+   - Keep Ollama-specific settings
+
+2. **`src/FeatureAssessment.Core/Agents/FeatureLookupAgent.cs`** - Update to support multiple providers
+   - Accept `ILlmClientFactory` instead of hardcoded Ollama client
+   - Factory creates appropriate LLM client based on configuration
+   - Agent code remains provider-agnostic
+
+**New Files:**
+
+3. **`src/FeatureAssessment.Core/Configuration/AnthropicConfiguration.cs`** - Anthropic settings
+   ```csharp
+   public class AnthropicConfiguration
+   {
+       public const string SectionName = "Anthropic";
+
+       public string ApiKey { get; set; } = string.Empty; // Load from env var
+       public string ModelName { get; set; } = "claude-haiku-4-5";
+       public int TimeoutSeconds { get; set; } = 30;
+       public int MaxRetries { get; set; } = 3;
+       public string ApiEndpoint { get; set; } = "https://api.anthropic.com";
+   }
+   ```
+
+4. **`src/FeatureAssessment.Core/Configuration/AnthropicConfigurationValidator.cs`** - Validator
+   ```csharp
+   public class AnthropicConfigurationValidator : IValidateOptions<AnthropicConfiguration>
+   {
+       public ValidateOptionsResult Validate(string? name, AnthropicConfiguration options)
+       {
+           // Validate ApiKey is not empty (required)
+           // Validate ModelName is not empty
+           // Validate TimeoutSeconds > 0
+           // Validate MaxRetries >= 0
+           // Validate ApiEndpoint is valid URI
+       }
+   }
+   ```
+
+5. **`src/FeatureAssessment.Core/Configuration/LlmProviderConfiguration.cs`** - Provider selection
+   ```csharp
+   public enum LlmProvider
+   {
+       Ollama,
+       Anthropic
+   }
+
+   public class LlmProviderConfiguration
+   {
+       public const string SectionName = "LlmProvider";
+
+       public LlmProvider Provider { get; set; } = LlmProvider.Anthropic; // Default to Anthropic
+       public OllamaConfiguration Ollama { get; set; } = new();
+       public AnthropicConfiguration Anthropic { get; set; } = new();
+   }
+   ```
+
+6. **`src/FeatureAssessment.Core/Clients/ILlmClientFactory.cs`** - Factory interface
+   ```csharp
+   public interface ILlmClientFactory
+   {
+       Kernel CreateKernel(IServiceProvider serviceProvider);
+       LlmProvider CurrentProvider { get; }
+   }
+   ```
+
+7. **`src/FeatureAssessment.Core/Clients/LlmClientFactory.cs`** - Factory implementation
+   ```csharp
+   public class LlmClientFactory : ILlmClientFactory
+   {
+       public Kernel CreateKernel(IServiceProvider serviceProvider)
+       {
+           var config = serviceProvider.GetRequiredService<IOptions<LlmProviderConfiguration>>();
+
+           return config.Value.Provider switch
+           {
+               LlmProvider.Ollama => CreateOllamaKernel(serviceProvider),
+               LlmProvider.Anthropic => CreateAnthropicKernel(serviceProvider),
+               _ => throw new NotSupportedException($"Provider {config.Value.Provider} not supported")
+           };
+       }
+
+       private Kernel CreateOllamaKernel(IServiceProvider serviceProvider) { /* ... */ }
+       private Kernel CreateAnthropicKernel(IServiceProvider serviceProvider) { /* ... */ }
+   }
+   ```
+
+8. **`tests/FeatureAssessment.Core.Tests/Configuration/AnthropicConfigurationValidatorTests.cs`** - Validator tests
+   - Test valid Anthropic configurations pass
+   - Test missing API key fails validation
+   - Test invalid endpoint fails validation
+
+9. **`tests/FeatureAssessment.Core.Tests/Clients/LlmClientFactoryTests.cs`** - Factory tests
+   - Test factory creates Ollama kernel when configured
+   - Test factory creates Anthropic kernel when configured
+   - Test factory throws on unsupported provider
+
+10. **`tests/FeatureAssessment.Core.Tests/Integration/AnthropicEndToEndTests.cs`** - E2E tests with Anthropic
+    - Mark with `[TestCategory("Integration")]`
+    - Test feature lookup with Claude Haiku 4.5
+    - Test tool calling works correctly
+    - Test all existing scenarios (feature identification, environment extraction, error handling)
+
+11. **`tests/FeatureAssessment.Core.Tests/Integration/OllamaEndToEndTests.cs`** - Update existing tests
+    - Ensure tests explicitly configure Ollama provider
+    - Verify no regressions from adding Anthropic support
+
+**Configuration Files:**
+
+12. **`appsettings.json`** (or equivalent) - Update configuration structure
+    ```json
+    {
+      "LlmProvider": {
+        "Provider": "Anthropic",
+        "Anthropic": {
+          "ApiKey": "",  // Load from environment variable ANTHROPIC_API_KEY
+          "ModelName": "claude-haiku-4-5",
+          "TimeoutSeconds": 30,
+          "MaxRetries": 3,
+          "ApiEndpoint": "https://api.anthropic.com"
+        },
+        "Ollama": {
+          "Endpoint": "http://localhost:11434",
+          "ModelName": "llama3.1:8b",
+          "TimeoutSeconds": 30,
+          "MaxRetries": 3
+        }
+      }
+    }
+    ```
+
+**Documentation Updates:**
+
+13. **`TESTING.md`** - Add Anthropic testing section
+    ```markdown
+    ## Testing with Anthropic
+
+    ### Prerequisites
+    - Anthropic API key: Sign up at https://console.anthropic.com
+    - Set environment variable: `export ANTHROPIC_API_KEY=sk-ant-...`
+    - Default model: `claude-haiku-4-5` (fast, cost-effective)
+
+    ### Configuration
+    ```bash
+    # Set API key (required)
+    export ANTHROPIC_API_KEY=sk-ant-api03-...
+
+    # Or on Windows PowerShell
+    $env:ANTHROPIC_API_KEY="sk-ant-api03-..."
+    ```
+
+    ### Running Tests with Anthropic
+    ```bash
+    # Run integration tests with Anthropic (requires API key)
+    dotnet test --filter "Category=Integration"
+
+    # Run only Anthropic-specific tests
+    dotnet test --filter "FullyQualifiedName~Anthropic"
+    ```
+
+    ### Switching Between Providers
+    - **Anthropic** (default): Production use, cloud-based, requires API key
+    - **Ollama**: Local development, no API key required, requires local setup
+
+    ### Cost Considerations
+    - Claude Haiku 4.5: ~$0.25 per million input tokens, ~$1.25 per million output tokens
+    - Integration tests make ~5-10 API calls
+    - Estimated cost per test run: < $0.01
+    ```
+
+14. **`tests/FeatureAssessment.TestHarness/README.md`** - Update harness documentation
+    - Add instructions for testing with Anthropic
+    - Add command-line flag usage: `--provider anthropic` or `--provider ollama`
+    - Document environment variable requirements
+
+**Package Dependencies:**
+
+```bash
+# Add Anthropic SDK to Core project
+dotnet add src/FeatureAssessment.Core package Anthropic.SDK
+# OR if using Semantic Kernel's Anthropic connector (when available)
+dotnet add src/FeatureAssessment.Core package Microsoft.SemanticKernel.Connectors.Anthropic
+
+# Note: As of early 2026, Semantic Kernel may not have official Anthropic connector
+# In that case, use Anthropic SDK directly or community connectors
+```
+
+#### Technical Decisions
+
+**Default Provider:**
+- **Anthropic (Claude Haiku 4.5)** is the default for production use
+  - Reasons: Deterministic, reliable tool calling, well-documented API
+  - Cost-effective with Haiku model
+  - Better performance than most local LLMs
+- **Ollama** remains available for local development and testing without API costs
+
+**API Key Management:**
+- API key MUST be loaded from environment variable (`ANTHROPIC_API_KEY`)
+- NEVER hardcode or commit API keys to version control
+- Fail fast at startup if Anthropic is configured but API key is missing
+- Log warnings if API key looks invalid (wrong format)
+
+**Provider Abstraction Strategy:**
+- Use Factory pattern (`ILlmClientFactory`) to create appropriate LLM client
+- Agent code remains provider-agnostic (no if/else for provider logic)
+- Configuration determines provider selection at runtime
+- Easy to add more providers in future (Azure OpenAI, Bedrock, etc.)
+
+**Tool Calling Compatibility:**
+- Anthropic's tool calling uses different format than OpenAI/Ollama
+- Semantic Kernel abstracts differences (if using SK connectors)
+- If using Anthropic SDK directly, implement adapter for tool calling
+- Test extensively to ensure feature lookup tools work correctly
+
+**Testing Strategy:**
+- Unit tests mock both providers (no API calls)
+- Integration tests separated by provider (Ollama vs Anthropic)
+- CI/CD: Unit tests always run, Anthropic integration tests only if API key present
+- Use `[TestCategory("Integration")]` and `[TestCategory("RequiresAnthropicApiKey")]`
+
+**Resilience & Error Handling:**
+- Apply same Polly policies to Anthropic as Ollama (retry, timeout, circuit breaker)
+- Handle Anthropic-specific errors (rate limits, authentication failures)
+- Provide clear error messages for common issues (missing API key, invalid model)
+
+**Model Selection:**
+- Default: `claude-haiku-4-5` (fast, cost-effective)
+- Alternative: `claude-sonnet-4-5` (better quality, higher cost)
+- Alternative: `claude-opus-4-6` (best quality, highest cost)
+- Configuration allows model override for different use cases
+
+**Migration Path:**
+- Existing Ollama code remains unchanged and fully functional
+- New Anthropic support added alongside (not replacing)
+- Configuration change switches provider (no code changes needed)
+- Test harness supports both for manual verification
+
+#### Success Criteria
+
+1. ✅ Configuration supports both Ollama and Anthropic providers
+2. ✅ Default provider is Anthropic with Claude Haiku 4.5
+3. ✅ API key loaded from environment variable securely
+4. ✅ All existing tests pass with Anthropic provider
+5. ✅ New Anthropic-specific integration tests pass
+6. ✅ Tool calling works correctly with Claude models
+7. ✅ Ollama tests still pass (no regressions)
+8. ✅ Test harness supports provider selection via command-line flag
+9. ✅ Documentation updated with Anthropic setup instructions
+10. ✅ Configuration validation prevents common misconfigurations
+11. ✅ All E2E tests pass with Anthropic as default provider
+12. ✅ Provider switching works without code changes (config only)
