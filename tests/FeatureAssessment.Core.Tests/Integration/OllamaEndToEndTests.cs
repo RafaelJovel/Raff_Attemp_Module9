@@ -1,4 +1,5 @@
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Tools;
@@ -17,14 +18,19 @@ namespace FeatureAssessment.Core.Tests.Integration;
 [TestCategory("Integration")]
 public class OllamaEndToEndTests
 {
-    private IOptions<OllamaConfiguration> _configOptions = null!;
+    private IOptions<OllamaConfiguration> _ollamaConfigOptions = null!;
+    private IOptions<LlmProviderConfiguration> _providerConfigOptions = null!;
+    private IOptions<AnthropicConfiguration> _anthropicConfigOptions = null!;
     private Mock<IFeatureLookupTools> _mockTools = null!;
-    private Mock<ILogger<FeatureLookupAgent>> _mockLogger = null!;
+    private Mock<ILogger<FeatureLookupAgent>> _mockAgentLogger = null!;
+    private Mock<ILogger<KernelFactory>> _mockKernelFactoryLogger = null!;
+    private IKernelFactory _kernelFactory = null!;
 
     [TestInitialize]
     public void Setup()
     {
-        var config = new OllamaConfiguration
+        // Configure Ollama
+        var ollamaConfig = new OllamaConfiguration
         {
             Endpoint = "http://localhost:11434",
             ModelName = "qwen2.5:latest",
@@ -33,10 +39,27 @@ public class OllamaEndToEndTests
             TimeoutSeconds = 30,
             MaxRetries = 3
         };
+        _ollamaConfigOptions = Options.Create(ollamaConfig);
 
-        _configOptions = Options.Create(config);
+        // Configure LLM Provider to use Ollama
+        var providerConfig = new LlmProviderConfiguration { Provider = LlmProvider.Ollama };
+        _providerConfigOptions = Options.Create(providerConfig);
+
+        // Configure Anthropic (required but not used for these tests)
+        var anthropicConfig = new AnthropicConfiguration { ApiKey = "dummy" };
+        _anthropicConfigOptions = Options.Create(anthropicConfig);
+
         _mockTools = new Mock<IFeatureLookupTools>();
-        _mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        _mockAgentLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        _mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
+
+        // Create KernelFactory for tests
+        _kernelFactory = new KernelFactory(
+            _providerConfigOptions,
+            _ollamaConfigOptions,
+            _anthropicConfigOptions,
+            _mockTools.Object,
+            _mockKernelFactoryLogger.Object);
 
         // Note: Mock tool setup omitted - these tests focus on configuration and state management
         // Real tool integration is validated in OllamaConnectivityTests
@@ -49,7 +72,7 @@ public class OllamaEndToEndTests
         // It doesn't invoke real Ollama (see other integration tests for that).
 
         // Arrange & Act
-        var agent = new FeatureLookupAgent(_mockTools.Object, _configOptions, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_kernelFactory, _mockAgentLogger.Object);
 
         // Assert
         Assert.IsNotNull(agent);
@@ -94,7 +117,7 @@ public class OllamaEndToEndTests
 
         // Assert metadata
         Assert.IsTrue(stateWithMetadata.Metadata.ContainsKey("start_time"));
-        Assert.AreEqual(1, stateWithMetadata.Metadata.Count);
+        Assert.HasCount(1, stateWithMetadata.Metadata);
     }
 
     [TestMethod]
@@ -102,7 +125,7 @@ public class OllamaEndToEndTests
     {
         // Arrange
         var validator = new OllamaConfigurationValidator();
-        var config = _configOptions.Value;
+        var config = _ollamaConfigOptions.Value;
 
         // Act
         var result = validator.Validate(null, config);
@@ -139,7 +162,7 @@ public class OllamaEndToEndTests
         // Enable this test for manual validation of the complete integration.
 
         // Arrange
-        var agent = new FeatureLookupAgent(_mockTools.Object, _configOptions, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_kernelFactory, _mockAgentLogger.Object);
         var query = "Is PLAT-1523 ready for production?";
 
         // Act

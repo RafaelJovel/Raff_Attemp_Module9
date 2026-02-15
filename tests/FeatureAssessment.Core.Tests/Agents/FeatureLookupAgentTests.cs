@@ -1,9 +1,10 @@
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
+using FeatureAssessment.Core.Tests.Helpers;
 using FeatureAssessment.Core.Tools;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 
 namespace FeatureAssessment.Core.Tests.Agents;
@@ -12,49 +13,30 @@ namespace FeatureAssessment.Core.Tests.Agents;
 public class FeatureLookupAgentTests
 {
     private Mock<IFeatureLookupTools> _mockTools = null!;
+    private Mock<IKernelFactory> _mockKernelFactory = null!;
     private Mock<ILogger<FeatureLookupAgent>> _mockLogger = null!;
-    private Mock<IOptions<OllamaConfiguration>> _mockConfigOptions = null!;
-    private OllamaConfiguration _config = null!;
 
     [TestInitialize]
     public void Setup()
     {
         _mockTools = new Mock<IFeatureLookupTools>();
         _mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
-        _config = new OllamaConfiguration
-        {
-            Endpoint = "http://localhost:11434",
-            ModelName = "qwen2.5:latest",
-            Temperature = 0.0,
-            MaxTokens = 500,
-            TimeoutSeconds = 30,
-            MaxRetries = 3
-        };
-        _mockConfigOptions = new Mock<IOptions<OllamaConfiguration>>();
-        _mockConfigOptions.Setup(x => x.Value).Returns(_config);
+        _mockKernelFactory = MockKernelFactoryHelper.CreateMockFactory(_mockTools);
     }
 
     [TestMethod]
-    public void Constructor_WithNullTools_ThrowsArgumentNullException()
+    public void Constructor_WithNullKernelFactory_ThrowsArgumentNullException()
     {
         // Act & Assert
-        var act = () => new FeatureLookupAgent(null!, _mockConfigOptions.Object, _mockLogger.Object);
-        act.Should().Throw<ArgumentNullException>().WithParameterName("tools");
-    }
-
-    [TestMethod]
-    public void Constructor_WithNullConfigOptions_ThrowsArgumentNullException()
-    {
-        // Act & Assert
-        var act = () => new FeatureLookupAgent(_mockTools.Object, null!, _mockLogger.Object);
-        act.Should().Throw<ArgumentNullException>().WithParameterName("configOptions");
+        var act = () => new FeatureLookupAgent(null!, _mockLogger.Object);
+        act.Should().Throw<ArgumentNullException>().WithParameterName("kernelFactory");
     }
 
     [TestMethod]
     public void Constructor_WithNullLogger_ThrowsArgumentNullException()
     {
         // Act & Assert
-        var act = () => new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, null!);
+        var act = () => new FeatureLookupAgent(_mockKernelFactory.Object, null!);
         act.Should().Throw<ArgumentNullException>().WithParameterName("logger");
     }
 
@@ -62,7 +44,7 @@ public class FeatureLookupAgentTests
     public async Task LookupFeatureAsync_WithNullQuery_ThrowsArgumentException()
     {
         // Arrange
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act & Assert
         var act = async () => await agent.LookupFeatureAsync(null!);
@@ -73,7 +55,7 @@ public class FeatureLookupAgentTests
     public async Task LookupFeatureAsync_WithEmptyQuery_ThrowsArgumentException()
     {
         // Arrange
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act & Assert
         var act = async () => await agent.LookupFeatureAsync("");
@@ -84,7 +66,7 @@ public class FeatureLookupAgentTests
     public async Task LookupFeatureAsync_WithWhitespaceQuery_ThrowsArgumentException()
     {
         // Arrange
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act & Assert
         var act = async () => await agent.LookupFeatureAsync("   ");

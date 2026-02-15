@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Tools;
@@ -10,6 +11,7 @@ using Moq;
 namespace FeatureAssessment.Core.Tests.Integration;
 
 [TestClass]
+[DoNotParallelize]
 public class OllamaTracingEndToEndTests
 {
     private List<Activity> _capturedActivities = null!;
@@ -49,10 +51,11 @@ public class OllamaTracingEndToEndTests
     public async Task FeatureLookupAgent_WithTracing_GeneratesCompleteTrace()
     {
         // Arrange
-        var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "data", "incoming");
+        var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "data");
         var tools = new FeatureLookupTools(dataDirectory);
 
-        var config = Options.Create(new OllamaConfiguration
+        // Configure Ollama
+        var ollamaConfig = Options.Create(new OllamaConfiguration
         {
             Endpoint = "http://localhost:11434",
             ModelName = "llama3.1:8b",
@@ -60,8 +63,18 @@ public class OllamaTracingEndToEndTests
             MaxTokens = 500
         });
 
-        var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
-        var agent = new FeatureLookupAgent(tools, config, mockLogger.Object);
+        // Configure LLM Provider to use Ollama
+        var providerConfig = Options.Create(new LlmProviderConfiguration { Provider = LlmProvider.Ollama });
+
+        // Configure Anthropic (required but not used for this test)
+        var anthropicConfig = Options.Create(new AnthropicConfiguration { ApiKey = "dummy" });
+
+        var mockAgentLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
+
+        // Create KernelFactory and Agent
+        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, mockKernelFactoryLogger.Object);
+        var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         var query = "Is PLAT-1523 ready for production?";
 
@@ -72,7 +85,7 @@ public class OllamaTracingEndToEndTests
         Assert.IsTrue(result.IsSuccess, $"Feature lookup should succeed. Error: {result.ErrorMessage}");
 
         // Verify activity was created
-        Assert.IsTrue(_capturedActivities.Count >= 1, "At least one activity should be captured");
+        Assert.IsGreaterThanOrEqualTo(1, _capturedActivities.Count, "At least one activity should be captured");
 
         var mainActivity = _capturedActivities.FirstOrDefault(a => a.OperationName == "FeatureLookupAgent.LookupFeature");
         Assert.IsNotNull(mainActivity, "Main FeatureLookupAgent activity should be present");
@@ -112,10 +125,11 @@ public class OllamaTracingEndToEndTests
     public async Task FeatureLookupAgent_WithFeatureNotFound_RecordsErrorInTrace()
     {
         // Arrange
-        var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "data", "incoming");
+        var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "data");
         var tools = new FeatureLookupTools(dataDirectory);
 
-        var config = Options.Create(new OllamaConfiguration
+        // Configure Ollama
+        var ollamaConfig = Options.Create(new OllamaConfiguration
         {
             Endpoint = "http://localhost:11434",
             ModelName = "llama3.1:8b",
@@ -123,8 +137,18 @@ public class OllamaTracingEndToEndTests
             MaxTokens = 500
         });
 
-        var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
-        var agent = new FeatureLookupAgent(tools, config, mockLogger.Object);
+        // Configure LLM Provider to use Ollama
+        var providerConfig = Options.Create(new LlmProviderConfiguration { Provider = LlmProvider.Ollama });
+
+        // Configure Anthropic (required but not used for this test)
+        var anthropicConfig = Options.Create(new AnthropicConfiguration { ApiKey = "dummy" });
+
+        var mockAgentLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
+
+        // Create KernelFactory and Agent
+        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, mockKernelFactoryLogger.Object);
+        var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         var query = "Is feature NONEXISTENT-999 ready?";
 
@@ -134,7 +158,7 @@ public class OllamaTracingEndToEndTests
         // Assert - Result may succeed or fail depending on LLM response
         // But we should still have trace data
 
-        Assert.IsTrue(_capturedActivities.Count >= 1, "At least one activity should be captured");
+        Assert.IsGreaterThanOrEqualTo(1, _capturedActivities.Count, "At least one activity should be captured");
 
         // Filter for our specific activity by BOTH operation name AND query tag to avoid test isolation issues
         var mainActivity = _capturedActivities.FirstOrDefault(a =>

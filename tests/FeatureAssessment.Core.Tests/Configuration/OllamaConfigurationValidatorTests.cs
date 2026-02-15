@@ -50,7 +50,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("Endpoint cannot be empty"));
+        Assert.Contains("Endpoint cannot be empty", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -68,7 +68,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("must be a valid HTTP or HTTPS URL"));
+        Assert.Contains("must be a valid HTTP or HTTPS URL", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -86,7 +86,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("must be a valid HTTP or HTTPS URL"));
+        Assert.Contains("must be a valid HTTP or HTTPS URL", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -104,7 +104,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("ModelName cannot be empty"));
+        Assert.Contains("ModelName cannot be empty", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -123,7 +123,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("Temperature must be between 0.0 and 1.0"));
+        Assert.Contains("Temperature must be between 0.0 and 1.0", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -142,7 +142,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("Temperature must be between 0.0 and 1.0"));
+        Assert.Contains("Temperature must be between 0.0 and 1.0", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -161,7 +161,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("MaxTokens must be greater than 0"));
+        Assert.Contains("MaxTokens must be greater than 0", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -180,7 +180,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("MaxTokens must be greater than 0"));
+        Assert.Contains("MaxTokens must be greater than 0", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -199,7 +199,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("TimeoutSeconds must be greater than 0"));
+        Assert.Contains("TimeoutSeconds must be greater than 0", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -218,7 +218,7 @@ public class OllamaConfigurationValidatorTests
 
         // Assert
         Assert.IsFalse(result.Succeeded);
-        Assert.IsTrue(result.FailureMessage!.Contains("MaxRetries must be 0 or greater"));
+        Assert.Contains("MaxRetries must be 0 or greater", result.FailureMessage!);
     }
 
     [TestMethod]
@@ -259,12 +259,12 @@ public class OllamaConfigurationValidatorTests
         // Assert
         Assert.IsFalse(result.Succeeded);
         var failures = result.FailureMessage!;
-        Assert.IsTrue(failures.Contains("Endpoint"));
-        Assert.IsTrue(failures.Contains("ModelName"));
-        Assert.IsTrue(failures.Contains("Temperature"));
-        Assert.IsTrue(failures.Contains("MaxTokens"));
-        Assert.IsTrue(failures.Contains("TimeoutSeconds"));
-        Assert.IsTrue(failures.Contains("MaxRetries"));
+        Assert.Contains("Endpoint", failures);
+        Assert.Contains("ModelName", failures);
+        Assert.Contains("Temperature", failures);
+        Assert.Contains("MaxTokens", failures);
+        Assert.Contains("TimeoutSeconds", failures);
+        Assert.Contains("MaxRetries", failures);
     }
 
     [TestMethod]

@@ -6,7 +6,15 @@
       "Bash(dotnet add:*)",
       "Bash(dotnet test:*)",
       "Bash(dotnet build:*)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(dotnet new:*)",
+      "Bash(\"C:/Temp/Raff_Attemp_Module9/test_assert_api.cs\":*)",
+      "Bash(git checkout:*)",
+      "Bash(ls:*)",
+      "Bash(dotnet nuget search:*)",
+      "Bash(dotnet package search:*)",
+      "Bash(dotnet remove package:*)",
+      "Bash(dotnet run:*)"
     ]
   }
 }

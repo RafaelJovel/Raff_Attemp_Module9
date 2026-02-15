@@ -11,19 +11,26 @@ namespace FeatureAssessment.TestHarness;
 /// </summary>
 public class ConsoleOutputHelper
 {
+    private readonly IOptions<LlmProviderConfiguration> _providerConfig;
     private readonly IOptions<OllamaConfiguration> _ollamaConfig;
+    private readonly IOptions<AnthropicConfiguration> _anthropicConfig;
 
-    public ConsoleOutputHelper(IOptions<OllamaConfiguration> ollamaConfig)
+    public ConsoleOutputHelper(
+        IOptions<LlmProviderConfiguration> providerConfig,
+        IOptions<OllamaConfiguration> ollamaConfig,
+        IOptions<AnthropicConfiguration> anthropicConfig)
     {
+        _providerConfig = providerConfig;
         _ollamaConfig = ollamaConfig;
+        _anthropicConfig = anthropicConfig;
     }
 
     /// <summary>
-    /// Display current configuration settings.
+    /// Display current configuration settings based on active provider.
     /// </summary>
     public void DisplayConfiguration()
     {
-        var config = _ollamaConfig.Value;
+        var provider = _providerConfig.Value.Provider;
 
         var table = new Table()
             .Border(TableBorder.Rounded)
@@ -31,10 +38,26 @@ public class ConsoleOutputHelper
             .AddColumn(new TableColumn("[bold]Setting[/]").Centered())
             .AddColumn(new TableColumn("[bold]Value[/]"));
 
-        table.AddRow("Ollama Endpoint", $"[cyan]{config.Endpoint}[/]");
-        table.AddRow("Model Name", $"[cyan]{config.ModelName}[/]");
-        table.AddRow("Timeout (seconds)", $"[cyan]{config.TimeoutSeconds}[/]");
-        table.AddRow("Max Retries", $"[cyan]{config.MaxRetries}[/]");
+        table.AddRow("Provider", $"[cyan]{provider}[/]");
+
+        if (provider == LlmProvider.Ollama)
+        {
+            var config = _ollamaConfig.Value;
+            table.AddRow("Endpoint", $"[cyan]{config.Endpoint}[/]");
+            table.AddRow("Model Name", $"[cyan]{config.ModelName}[/]");
+            table.AddRow("Timeout (seconds)", $"[cyan]{config.TimeoutSeconds}[/]");
+            table.AddRow("Max Retries", $"[cyan]{config.MaxRetries}[/]");
+        }
+        else if (provider == LlmProvider.Anthropic)
+        {
+            var config = _anthropicConfig.Value;
+            table.AddRow("Model Name", $"[cyan]{config.ModelName}[/]");
+            table.AddRow("Temperature", $"[cyan]{config.Temperature}[/]");
+            table.AddRow("Max Tokens", $"[cyan]{config.MaxTokens}[/]");
+            table.AddRow("Timeout (seconds)", $"[cyan]{config.TimeoutSeconds}[/]");
+            table.AddRow("Max Retries", $"[cyan]{config.MaxRetries}[/]");
+            table.AddRow("API Key", $"[cyan]{MaskApiKey(config.ApiKey)}[/]");
+        }
 
         AnsiConsole.Write(
             new Panel(table)
@@ -42,6 +65,14 @@ public class ConsoleOutputHelper
                 .BorderColor(Color.Yellow)
         );
         AnsiConsole.WriteLine();
+    }
+
+    private static string MaskApiKey(string apiKey)
+    {
+        if (string.IsNullOrEmpty(apiKey) || apiKey.Length < 12)
+            return "***";
+
+        return $"{apiKey.Substring(0, 10)}...{apiKey.Substring(apiKey.Length - 4)}";
     }
 
     /// <summary>

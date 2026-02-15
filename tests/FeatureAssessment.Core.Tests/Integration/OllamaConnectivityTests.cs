@@ -1,4 +1,5 @@
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Tools;
@@ -58,8 +59,8 @@ public class OllamaConnectivityTests
             var content = await response.Content.ReadAsStringAsync();
 
             // Assert
-            content.Should().Contain("qwen2.5",
-                "Model qwen2.5 should be available in Ollama. Pull it with 'docker exec <container> ollama pull qwen2.5'");
+            content.Should().Contain("llama3.1",
+                "Model llama3.1:8b should be available in Ollama. Pull it with 'ollama pull llama3.1:8b'");
         }
         catch (HttpRequestException ex)
         {
@@ -72,8 +73,11 @@ public class OllamaConnectivityTests
     {
         // Arrange
         var mockTools = new Mock<IFeatureLookupTools>();
-        var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
-        var config = new OllamaConfiguration
+        var mockAgentLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
+
+        // Configure Ollama
+        var ollamaConfig = new OllamaConfiguration
         {
             Endpoint = OllamaEndpoint, // Ollama connector doesn't need /v1 suffix
             ModelName = ModelName,
@@ -82,14 +86,30 @@ public class OllamaConnectivityTests
             TimeoutSeconds = 30,
             MaxRetries = 3
         };
-        var configOptions = Microsoft.Extensions.Options.Options.Create(config);
+        var ollamaConfigOptions = Microsoft.Extensions.Options.Options.Create(ollamaConfig);
+
+        // Configure LLM Provider to use Ollama
+        var providerConfig = new LlmProviderConfiguration { Provider = LlmProvider.Ollama };
+        var providerConfigOptions = Microsoft.Extensions.Options.Options.Create(providerConfig);
+
+        // Configure Anthropic (required but not used for this test)
+        var anthropicConfig = new AnthropicConfiguration { ApiKey = "dummy" };
+        var anthropicConfigOptions = Microsoft.Extensions.Options.Options.Create(anthropicConfig);
 
         // Setup mock tools to return empty list (agent should handle this gracefully)
         mockTools
             .Setup(t => t.ListAllFeaturesAsync())
             .ReturnsAsync(new List<FeatureInfo>());
 
-        var agent = new FeatureLookupAgent(mockTools.Object, configOptions, mockLogger.Object);
+        // Create KernelFactory and Agent
+        var kernelFactory = new KernelFactory(
+            providerConfigOptions,
+            ollamaConfigOptions,
+            anthropicConfigOptions,
+            mockTools.Object,
+            mockKernelFactoryLogger.Object);
+
+        var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         // Act
         var result = await agent.LookupFeatureAsync("Is feature XYZ ready?");
@@ -110,8 +130,11 @@ public class OllamaConnectivityTests
         // Arrange
         var dataDirectory = Path.Combine(Directory.GetCurrentDirectory(), "..", "..", "..", "..", "..", "data", "incoming");
         var tools = new FeatureLookupTools(dataDirectory);
-        var mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
-        var config = new OllamaConfiguration
+        var mockAgentLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
+
+        // Configure Ollama
+        var ollamaConfig = new OllamaConfiguration
         {
             Endpoint = OllamaEndpoint, // Ollama connector doesn't need /v1 suffix
             ModelName = ModelName,
@@ -120,9 +143,25 @@ public class OllamaConnectivityTests
             TimeoutSeconds = 30,
             MaxRetries = 3
         };
-        var configOptions = Microsoft.Extensions.Options.Options.Create(config);
+        var ollamaConfigOptions = Microsoft.Extensions.Options.Options.Create(ollamaConfig);
 
-        var agent = new FeatureLookupAgent(tools, configOptions, mockLogger.Object);
+        // Configure LLM Provider to use Ollama
+        var providerConfig = new LlmProviderConfiguration { Provider = LlmProvider.Ollama };
+        var providerConfigOptions = Microsoft.Extensions.Options.Options.Create(providerConfig);
+
+        // Configure Anthropic (required but not used for this test)
+        var anthropicConfig = new AnthropicConfiguration { ApiKey = "dummy" };
+        var anthropicConfigOptions = Microsoft.Extensions.Options.Options.Create(anthropicConfig);
+
+        // Create KernelFactory and Agent
+        var kernelFactory = new KernelFactory(
+            providerConfigOptions,
+            ollamaConfigOptions,
+            anthropicConfigOptions,
+            tools,
+            mockKernelFactoryLogger.Object);
+
+        var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         // Act
         var result = await agent.LookupFeatureAsync("Is PLAT-1523 ready for production?");

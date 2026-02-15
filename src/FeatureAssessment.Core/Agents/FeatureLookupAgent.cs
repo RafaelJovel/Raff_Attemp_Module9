@@ -1,36 +1,29 @@
 using System.Diagnostics;
 using System.Text.Json;
-using FeatureAssessment.Core.Configuration;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Prompts;
-using FeatureAssessment.Core.Tools;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
-using Microsoft.SemanticKernel.Connectors.Ollama;
 
 namespace FeatureAssessment.Core.Agents;
 
 /// <summary>
 /// Agent that uses LLM to translate natural language queries into feature metadata.
-/// Uses IOptions pattern for configuration and supports resilience policies.
+/// Provider-agnostic implementation using IKernelFactory for LLM abstraction.
 /// </summary>
 public class FeatureLookupAgent : IFeatureLookupAgent
 {
-    private readonly IFeatureLookupTools _tools;
-    private readonly OllamaConfiguration _config;
+    private readonly IKernelFactory _kernelFactory;
     private readonly ILogger<FeatureLookupAgent> _logger;
 
     public FeatureLookupAgent(
-        IFeatureLookupTools tools,
-        IOptions<OllamaConfiguration> configOptions,
+        IKernelFactory kernelFactory,
         ILogger<FeatureLookupAgent> logger)
     {
-        _tools = tools ?? throw new ArgumentNullException(nameof(tools));
-        ArgumentNullException.ThrowIfNull(configOptions);
-        _config = configOptions.Value;
+        _kernelFactory = kernelFactory ?? throw new ArgumentNullException(nameof(kernelFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -50,8 +43,9 @@ public class FeatureLookupAgent : IFeatureLookupAgent
 
         try
         {
-            // Create kernel with Ollama provider
-            var kernel = CreateKernel();
+            // Create kernel with configured LLM provider
+            var kernel = _kernelFactory.CreateKernel();
+            _logger.LogDebug("Using LLM provider: {Provider}", _kernelFactory.CurrentProvider);
 
             // Execute agent
             var response = await ExecuteAgentAsync(kernel, query, cancellationToken);
@@ -95,21 +89,6 @@ public class FeatureLookupAgent : IFeatureLookupAgent
         }
     }
 
-    private Kernel CreateKernel()
-    {
-        var builder = Kernel.CreateBuilder();
-
-        // Configure Ollama using dedicated Ollama connector for function calling support
-        builder.AddOllamaChatCompletion(
-            modelId: _config.ModelName,
-            endpoint: new Uri(_config.Endpoint.Replace("/v1", ""))); // Ollama connector doesn't need /v1 suffix
-
-        // Register feature lookup tools as a plugin
-        builder.Plugins.AddFromObject(_tools, "FeatureLookup");
-
-        return builder.Build();
-    }
-
     private async Task<string> ExecuteAgentAsync(Kernel kernel, string query, CancellationToken cancellationToken)
     {
         var chatCompletion = kernel.GetRequiredService<IChatCompletionService>();
@@ -119,9 +98,9 @@ public class FeatureLookupAgent : IFeatureLookupAgent
         chatHistory.AddUserMessage(query);
 
         // Execute with automatic function calling enabled
-        var executionSettings = new OllamaPromptExecutionSettings
+        // Use provider-agnostic PromptExecutionSettings
+        var executionSettings = new PromptExecutionSettings
         {
-            Temperature = (float)_config.Temperature,
             FunctionChoiceBehavior = FunctionChoiceBehavior.Auto()
         };
 
@@ -142,20 +121,71 @@ public class FeatureLookupAgent : IFeatureLookupAgent
 
     private FeatureLookupResult ParseResponse(string response)
     {
+        _logger.LogTrace("ParseResponse called with response length: {Length}", response?.Length ?? 0);
+        _logger.LogTrace("Raw response: {Response}", response);
+
+        if (string.IsNullOrWhiteSpace(response))
+        {
+            _logger.LogWarning("Response is null or empty");
+            return new FeatureLookupResult
+            {
+                IsSuccess = false,
+                ErrorMessage = "Agent returned empty response"
+            };
+        }
+
         try
         {
-            // Try to extract JSON from response (in case there's extra text)
-            var jsonStart = response.IndexOf('{');
-            var jsonEnd = response.LastIndexOf('}');
+            // Clean up the response - remove markdown code blocks if present
+            var cleanedResponse = response.Trim();
+            if (cleanedResponse.StartsWith("```json"))
+            {
+                cleanedResponse = cleanedResponse.Substring(7);
+            }
+            if (cleanedResponse.StartsWith("```"))
+            {
+                cleanedResponse = cleanedResponse.Substring(3);
+            }
+            if (cleanedResponse.EndsWith("```"))
+            {
+                cleanedResponse = cleanedResponse.Substring(0, cleanedResponse.Length - 3);
+            }
+            cleanedResponse = cleanedResponse.Trim();
+
+            // Try to extract the FIRST JSON object from response
+            var jsonStart = cleanedResponse.IndexOf('{');
+            var jsonEnd = -1;
+
+            if (jsonStart >= 0)
+            {
+                // Find the matching closing brace for the first opening brace
+                int braceCount = 0;
+                for (int i = jsonStart; i < cleanedResponse.Length; i++)
+                {
+                    if (cleanedResponse[i] == '{') braceCount++;
+                    else if (cleanedResponse[i] == '}')
+                    {
+                        braceCount--;
+                        if (braceCount == 0)
+                        {
+                            jsonEnd = i;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            _logger.LogTrace("JSON extraction: jsonStart={JsonStart}, jsonEnd={JsonEnd}", jsonStart, jsonEnd);
 
             if (jsonStart >= 0 && jsonEnd >= jsonStart)
             {
-                var jsonText = response.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                var jsonText = cleanedResponse.Substring(jsonStart, jsonEnd - jsonStart + 1);
+                _logger.LogTrace("Extracted JSON text: {JsonText}", jsonText);
 
                 var jsonDoc = JsonDocument.Parse(jsonText);
                 var root = jsonDoc.RootElement;
 
-                return new FeatureLookupResult
+                var result = new FeatureLookupResult
                 {
                     FeatureKey = root.TryGetProperty("feature_key", out var fk) ? fk.GetString() : null,
                     FeatureId = root.TryGetProperty("feature_id", out var fi) ? fi.GetString() : null,
@@ -166,9 +196,15 @@ public class FeatureLookupAgent : IFeatureLookupAgent
                     ErrorMessage = root.TryGetProperty("error_message", out var em) ? em.GetString() : null,
                     AdditionalContext = root.TryGetProperty("context", out var ctx) ? ctx.GetString() : null
                 };
+
+                _logger.LogDebug(
+                    "Parsed result: Success={Success}, FeatureKey={FeatureKey}, FeatureId={FeatureId}, TargetEnv={TargetEnv}",
+                    result.IsSuccess, result.FeatureKey, result.FeatureId, result.TargetEnvironment);
+
+                return result;
             }
 
-            _logger.LogWarning("Could not find JSON in response: {Response}", response);
+            _logger.LogWarning("Could not find JSON object in response: {Response}", cleanedResponse);
             return new FeatureLookupResult
             {
                 IsSuccess = false,

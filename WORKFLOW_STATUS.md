@@ -313,9 +313,9 @@ The assistant MUST update this "Current Status" section BEFORE taking any action
 
 ### Active Work Item
 - **Work Item File**: `changes/workitem002.md` - Create the Feature Lookup Agent
-- **Current Task**: Task 5 - Manual Testing Harness
-- **Current Stage**: PLAN
-- **Last Updated**: 2026-02-14
+- **Current Task**: Task 6 - Anthropic LLM Support
+- **Current Stage**: BUILD & ASSESS
+- **Last Updated**: 2026-02-15
 
 ### When Active
 When working on a story, this section will show:

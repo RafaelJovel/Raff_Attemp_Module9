@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Tools;
@@ -22,16 +23,25 @@ var configuration = new ConfigurationBuilder()
 // Setup DI container
 var services = new ServiceCollection();
 
+// Configure LLM Provider
+services.Configure<LlmProviderConfiguration>(configuration.GetSection(LlmProviderConfiguration.SectionName));
+
 // Configure Ollama
 services.Configure<OllamaConfiguration>(configuration.GetSection(OllamaConfiguration.SectionName));
 services.AddSingleton<IValidateOptions<OllamaConfiguration>, OllamaConfigurationValidator>();
 
+// Configure Anthropic
+services.Configure<AnthropicConfiguration>(configuration.GetSection(AnthropicConfiguration.SectionName));
+services.AddSingleton<IValidateOptions<AnthropicConfiguration>, AnthropicOptionsValidator>();
+
 // Determine data directory path (relative to project root)
-// When running from bin/Debug/net10.0, go up 4 levels to project root
-var dataDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "data"));
+// When running from tests/FeatureAssessment.TestHarness/bin/Debug/net10.0, go up 5 levels to project root, then into data
+// Note: FeatureLookupTools will append "incoming" subdirectory internally
+var dataDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "data"));
 
 // Register application services
 services.AddSingleton<IFeatureLookupTools>(sp => new FeatureLookupTools(dataDirectory));
+services.AddSingleton<IKernelFactory, KernelFactory>();
 services.AddSingleton<IFeatureLookupAgent, FeatureLookupAgent>();
 services.AddSingleton<ConsoleOutputHelper>();
 
@@ -57,16 +67,38 @@ var serviceProvider = services.BuildServiceProvider();
 // Validate configuration at startup
 try
 {
-    var ollamaConfig = serviceProvider.GetRequiredService<IOptions<OllamaConfiguration>>().Value;
-    var validator = serviceProvider.GetRequiredService<IValidateOptions<OllamaConfiguration>>();
-    var validationResult = validator.Validate(OllamaConfiguration.SectionName, ollamaConfig);
+    var providerConfig = serviceProvider.GetRequiredService<IOptions<LlmProviderConfiguration>>().Value;
+    Console.WriteLine($"Using LLM Provider: {providerConfig.Provider}");
 
-    if (validationResult.Failed)
+    if (providerConfig.Provider == LlmProvider.Ollama)
     {
-        Console.ForegroundColor = ConsoleColor.Red;
-        Console.WriteLine($"Configuration validation failed: {validationResult.FailureMessage}");
-        Console.ResetColor();
-        return 1;
+        var ollamaConfig = serviceProvider.GetRequiredService<IOptions<OllamaConfiguration>>().Value;
+        var validator = serviceProvider.GetRequiredService<IValidateOptions<OllamaConfiguration>>();
+        var validationResult = validator.Validate(OllamaConfiguration.SectionName, ollamaConfig);
+
+        if (validationResult.Failed)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Ollama configuration validation failed: {validationResult.FailureMessage}");
+            Console.ResetColor();
+            return 1;
+        }
+    }
+    else if (providerConfig.Provider == LlmProvider.Anthropic)
+    {
+        var anthropicConfig = serviceProvider.GetRequiredService<IOptions<AnthropicConfiguration>>().Value;
+        var validator = serviceProvider.GetRequiredService<IValidateOptions<AnthropicConfiguration>>();
+        var validationResult = validator.Validate(AnthropicConfiguration.SectionName, anthropicConfig);
+
+        if (validationResult.Failed)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Anthropic configuration validation failed: {validationResult.FailureMessage}");
+            Console.ResetColor();
+            return 1;
+        }
+
+        Console.WriteLine($"Using Anthropic model: {anthropicConfig.ModelName}");
     }
 }
 catch (Exception ex)

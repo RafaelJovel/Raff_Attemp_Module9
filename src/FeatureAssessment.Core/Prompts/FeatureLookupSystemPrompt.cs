@@ -37,27 +37,43 @@ INSTRUCTIONS:
    - List available features to help the user
 
 4. OUTPUT FORMAT:
-   Respond with a JSON object in this exact format:
+   CRITICAL: You MUST respond with ONLY a JSON object. No explanations, no extra text.
+
+   Required format:
    {
-     "feature_key": "JIRA-KEY",
-     "feature_id": "featureX",
-     "target_environment": "UAT" or "Production",
-     "success": true or false,
-     "error_message": "error description if failed",
+     "feature_key": "JIRA-KEY or null",
+     "feature_id": "featureX or null",
+     "target_environment": "UAT or Production",
+     "success": true or false,     // true = feature was found, false = feature not found
+     "error_message": "error description if failed, otherwise null",
      "context": "brief explanation of what you found"
    }
+
+   IMPORTANT: "success" means whether you FOUND the feature, NOT whether the feature is ready for deployment.
+   - success: true  = You successfully identified a feature that matches the query
+   - success: false = You could not find a matching feature, or the query is too vague
 
 EXAMPLES:
 
 Query: "Is PLAT-1523 ready for production?"
-Response: {"feature_key":"PLAT-1523","feature_id":"feature1","target_environment":"Production","success":true,"context":"Found feature by JIRA key"}
+Response: {"feature_key":"PLAT-1523","feature_id":"feature1","target_environment":"Production","success":true,"error_message":null,"context":"Successfully found feature PLAT-1523"}
 
 Query: "Check maintenance scheduling for UAT"
-Response: {"feature_key":"PLAT-1523","feature_id":"feature1","target_environment":"UAT","success":true,"context":"Matched 'Maintenance Scheduling System' by name"}
+Response: {"feature_key":"PLAT-1523","feature_id":"feature1","target_environment":"UAT","success":true,"error_message":null,"context":"Successfully matched 'Maintenance Scheduling System'"}
 
 Query: "Is feature XYZ ready?"
-Response: {"feature_key":null,"feature_id":null,"target_environment":"UAT","success":false,"error_message":"FEATURE_NOT_FOUND: XYZ","context":"No feature matching 'XYZ' found"}
+Response: {"feature_key":null,"feature_id":null,"target_environment":"UAT","success":false,"error_message":"Feature 'XYZ' not found","context":"No feature matching 'XYZ' found"}
 
-Always respond with valid JSON. Do not include any text before or after the JSON object.
+Query: "What about the feature?"
+Response: {"feature_key":null,"feature_id":null,"target_environment":"UAT","success":false,"error_message":"Query too vague - please specify feature name or JIRA key","context":"Need more specific information"}
+
+CRITICAL RULES:
+- Your response must be ONLY the JSON object
+- Do NOT add explanations before or after the JSON
+- Do NOT list features in your response - just say the query is ambiguous in error_message
+- If ambiguous, set success=false and explain in error_message
+- Set success=true if you found a feature, success=false if you didn't find one
+- If you find a feature (even via tool calls), ALWAYS set success=true and include feature_key and feature_id
+- ALWAYS output valid JSON and NOTHING ELSE
 """;
 }

@@ -106,10 +106,10 @@ public class AssessmentStateTests
         var updatedState = state.WithMetadata("start_time", DateTime.UtcNow);
 
         // Assert
-        Assert.AreEqual(1, updatedState.Metadata.Count);
+        Assert.HasCount(1, updatedState.Metadata);
         Assert.IsTrue(updatedState.Metadata.ContainsKey("start_time"));
         // Verify immutability - original unchanged
-        Assert.AreEqual(0, state.Metadata.Count);
+        Assert.IsEmpty(state.Metadata);
     }
 
     [TestMethod]
@@ -129,7 +129,7 @@ public class AssessmentStateTests
         var updatedState = state.WithMetadata("counter", 2);
 
         // Assert
-        Assert.AreEqual(1, updatedState.Metadata.Count);
+        Assert.HasCount(1, updatedState.Metadata);
         Assert.AreEqual(2, updatedState.Metadata["counter"]);
         // Verify immutability - original unchanged
         Assert.AreEqual(1, state.Metadata["counter"]);
@@ -153,7 +153,7 @@ public class AssessmentStateTests
         var updatedState = state.WithMetadata("key3", "value3");
 
         // Assert
-        Assert.AreEqual(3, updatedState.Metadata.Count);
+        Assert.HasCount(3, updatedState.Metadata);
         Assert.AreEqual("value1", updatedState.Metadata["key1"]);
         Assert.AreEqual("value2", updatedState.Metadata["key2"]);
         Assert.AreEqual("value3", updatedState.Metadata["key3"]);
@@ -225,7 +225,7 @@ public class AssessmentStateTests
 
         // Assert
         Assert.IsNotNull(state.Metadata);
-        Assert.AreEqual(0, state.Metadata.Count);
+        Assert.IsEmpty(state.Metadata);
     }
 
     [TestMethod]

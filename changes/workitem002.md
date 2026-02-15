@@ -709,7 +709,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package OpenTelemetry.Exporter.Con
 - **When** the user runs the standalone test harness with sample queries
 - **Then** the agent can be manually verified through console output showing feature identification and environment extraction
 
-**Commit**: (pending) - feat: add manual testing harness for Feature Lookup Agent (Task 5)
+**Commit**: `fd0e0b3` - feat: add manual testing harness for Feature Lookup Agent (Task 5)
 
 **Additional Requirements (from Task 4 Reflection):**
 
@@ -927,7 +927,7 @@ dotnet add tests/FeatureAssessment.TestHarness package Spectre.Console  # Option
 Run the agent standalone with test queries and verify output makes sense.
 
 ### Task 6: Anthropic LLM Support
-**Status**: ⚪ PENDING
+**Status**: 🔵 IN PROGRESS
 
 **Acceptance Criteria:**
 
@@ -1002,53 +1002,81 @@ Run the agent standalone with test queries and verify output makes sense.
     - Expected: No regressions from adding Anthropic support
     - Verify: Ollama remains default for local development
 
-#### File Changes
+#### File Changes (Updated Based on Research)
+
+**Package Dependencies:**
+```bash
+# Add official Anthropic SDK (version 10+)
+dotnet add src/FeatureAssessment.Core package Anthropic
+
+# Add Microsoft.Extensions.AI abstractions
+dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.AI.Abstractions
+dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.AI
+```
 
 **Modified Files:**
 
-1. **`src/FeatureAssessment.Core/Configuration/OllamaConfiguration.cs`** → Rename to `LlmConfiguration.cs`
-   - Add `LlmProvider` enum (Ollama, Anthropic)
-   - Add provider selection property
-   - Keep Ollama-specific settings
-
-2. **`src/FeatureAssessment.Core/Agents/FeatureLookupAgent.cs`** - Update to support multiple providers
-   - Accept `ILlmClientFactory` instead of hardcoded Ollama client
-   - Factory creates appropriate LLM client based on configuration
-   - Agent code remains provider-agnostic
+1. **`src/FeatureAssessment.Core/Agents/FeatureLookupAgent.cs`** - Update to accept IChatClient
+   - Change constructor to accept `IChatClient` instead of Semantic Kernel directly
+   - Or accept factory that creates kernel from IChatClient
+   - Agent logic remains provider-agnostic
+   - Tool registration unchanged
 
 **New Files:**
 
-3. **`src/FeatureAssessment.Core/Configuration/AnthropicConfiguration.cs`** - Anthropic settings
+2. **`src/FeatureAssessment.Core/Configuration/AnthropicConfiguration.cs`** - Anthropic settings
    ```csharp
+   namespace FeatureAssessment.Core.Configuration;
+
    public class AnthropicConfiguration
    {
        public const string SectionName = "Anthropic";
 
-       public string ApiKey { get; set; } = string.Empty; // Load from env var
+       // Load from environment variable ANTHROPIC_API_KEY
+       public string ApiKey { get; set; } = string.Empty;
+
+       // Default to Claude Haiku 4.5 (fast, cost-effective)
        public string ModelName { get; set; } = "claude-haiku-4-5";
+
        public int TimeoutSeconds { get; set; } = 30;
        public int MaxRetries { get; set; } = 3;
-       public string ApiEndpoint { get; set; } = "https://api.anthropic.com";
+       public int MaxTokens { get; set; } = 4096;
    }
    ```
 
-4. **`src/FeatureAssessment.Core/Configuration/AnthropicConfigurationValidator.cs`** - Validator
+3. **`src/FeatureAssessment.Core/Configuration/AnthropicConfigurationValidator.cs`** - Validator
    ```csharp
-   public class AnthropicConfigurationValidator : IValidateOptions<AnthropicConfiguration>
+   using FluentValidation;
+
+   namespace FeatureAssessment.Core.Configuration;
+
+   public class AnthropicConfigurationValidator : AbstractValidator<AnthropicConfiguration>
    {
-       public ValidateOptionsResult Validate(string? name, AnthropicConfiguration options)
+       public AnthropicConfigurationValidator()
        {
-           // Validate ApiKey is not empty (required)
-           // Validate ModelName is not empty
-           // Validate TimeoutSeconds > 0
-           // Validate MaxRetries >= 0
-           // Validate ApiEndpoint is valid URI
+           RuleFor(x => x.ApiKey)
+               .NotEmpty()
+               .WithMessage("Anthropic API key is required. Set ANTHROPIC_API_KEY environment variable.");
+
+           RuleFor(x => x.ModelName)
+               .NotEmpty()
+               .WithMessage("Anthropic model name is required.");
+
+           RuleFor(x => x.TimeoutSeconds)
+               .GreaterThan(0)
+               .WithMessage("Timeout must be greater than 0 seconds.");
+
+           RuleFor(x => x.MaxRetries)
+               .GreaterThanOrEqualTo(0)
+               .WithMessage("MaxRetries must be non-negative.");
        }
    }
    ```
 
-5. **`src/FeatureAssessment.Core/Configuration/LlmProviderConfiguration.cs`** - Provider selection
+4. **`src/FeatureAssessment.Core/Configuration/LlmProviderConfiguration.cs`** - Provider selection
    ```csharp
+   namespace FeatureAssessment.Core.Configuration;
+
    public enum LlmProvider
    {
        Ollama,
@@ -1059,167 +1087,451 @@ Run the agent standalone with test queries and verify output makes sense.
    {
        public const string SectionName = "LlmProvider";
 
-       public LlmProvider Provider { get; set; } = LlmProvider.Anthropic; // Default to Anthropic
-       public OllamaConfiguration Ollama { get; set; } = new();
-       public AnthropicConfiguration Anthropic { get; set; } = new();
+       // Default to Anthropic for production use
+       public LlmProvider Provider { get; set; } = LlmProvider.Anthropic;
    }
    ```
 
-6. **`src/FeatureAssessment.Core/Clients/ILlmClientFactory.cs`** - Factory interface
+5. **`src/FeatureAssessment.Core/Clients/IChatClientFactory.cs`** - Factory interface
    ```csharp
-   public interface ILlmClientFactory
+   using Microsoft.Extensions.AI;
+
+   namespace FeatureAssessment.Core.Clients;
+
+   /// <summary>
+   /// Factory for creating LLM chat clients based on configuration
+   /// </summary>
+   public interface IChatClientFactory
    {
-       Kernel CreateKernel(IServiceProvider serviceProvider);
+       /// <summary>
+       /// Creates an IChatClient for the configured LLM provider
+       /// </summary>
+       IChatClient CreateChatClient();
+
+       /// <summary>
+       /// Gets the currently configured provider
+       /// </summary>
        LlmProvider CurrentProvider { get; }
    }
    ```
 
-7. **`src/FeatureAssessment.Core/Clients/LlmClientFactory.cs`** - Factory implementation
+6. **`src/FeatureAssessment.Core/Clients/ChatClientFactory.cs`** - Factory implementation
    ```csharp
-   public class LlmClientFactory : ILlmClientFactory
-   {
-       public Kernel CreateKernel(IServiceProvider serviceProvider)
-       {
-           var config = serviceProvider.GetRequiredService<IOptions<LlmProviderConfiguration>>();
+   using Anthropic;
+   using Microsoft.Extensions.AI;
+   using Microsoft.Extensions.Options;
+   using Microsoft.SemanticKernel.Connectors.Ollama;
 
-           return config.Value.Provider switch
+   namespace FeatureAssessment.Core.Clients;
+
+   public class ChatClientFactory : IChatClientFactory
+   {
+       private readonly IOptions<LlmProviderConfiguration> _providerConfig;
+       private readonly IOptions<OllamaConfiguration> _ollamaConfig;
+       private readonly IOptions<AnthropicConfiguration> _anthropicConfig;
+       private readonly ILogger<ChatClientFactory> _logger;
+
+       public ChatClientFactory(
+           IOptions<LlmProviderConfiguration> providerConfig,
+           IOptions<OllamaConfiguration> ollamaConfig,
+           IOptions<AnthropicConfiguration> anthropicConfig,
+           ILogger<ChatClientFactory> logger)
+       {
+           _providerConfig = providerConfig;
+           _ollamaConfig = ollamaConfig;
+           _anthropicConfig = anthropicConfig;
+           _logger = logger;
+       }
+
+       public LlmProvider CurrentProvider => _providerConfig.Value.Provider;
+
+       public IChatClient CreateChatClient()
+       {
+           _logger.LogInformation("Creating chat client for provider: {Provider}", CurrentProvider);
+
+           return CurrentProvider switch
            {
-               LlmProvider.Ollama => CreateOllamaKernel(serviceProvider),
-               LlmProvider.Anthropic => CreateAnthropicKernel(serviceProvider),
-               _ => throw new NotSupportedException($"Provider {config.Value.Provider} not supported")
+               LlmProvider.Ollama => CreateOllamaChatClient(),
+               LlmProvider.Anthropic => CreateAnthropicChatClient(),
+               _ => throw new NotSupportedException($"Provider {CurrentProvider} is not supported")
            };
        }
 
-       private Kernel CreateOllamaKernel(IServiceProvider serviceProvider) { /* ... */ }
-       private Kernel CreateAnthropicKernel(IServiceProvider serviceProvider) { /* ... */ }
+       private IChatClient CreateOllamaChatClient()
+       {
+           var config = _ollamaConfig.Value;
+
+           // Use Semantic Kernel's Ollama connector
+           // Return IChatClient wrapper or adapter
+           // Implementation details depend on SK's IChatClient support
+
+           _logger.LogInformation("Created Ollama chat client: {Endpoint}, Model: {Model}",
+               config.Endpoint, config.ModelName);
+
+           // TODO: Implementation based on Semantic Kernel's IChatClient integration
+           throw new NotImplementedException("Ollama IChatClient integration pending");
+       }
+
+       private IChatClient CreateAnthropicChatClient()
+       {
+           var config = _anthropicConfig.Value;
+
+           // Use official Anthropic SDK
+           var anthropicClient = new AnthropicClient(config.ApiKey);
+
+           // Convert to IChatClient with function invocation support
+           IChatClient chatClient = anthropicClient
+               .AsIChatClient(config.ModelName)
+               .AsBuilder()
+               .UseFunctionInvocation()
+               .Build();
+
+           _logger.LogInformation("Created Anthropic chat client: Model: {Model}", config.ModelName);
+
+           return chatClient;
+       }
    }
    ```
 
-8. **`tests/FeatureAssessment.Core.Tests/Configuration/AnthropicConfigurationValidatorTests.cs`** - Validator tests
-   - Test valid Anthropic configurations pass
-   - Test missing API key fails validation
-   - Test invalid endpoint fails validation
+7. **`src/FeatureAssessment.Core/Clients/SemanticKernelHelper.cs`** - Kernel integration helper
+   ```csharp
+   using Microsoft.Extensions.AI;
+   using Microsoft.SemanticKernel;
 
-9. **`tests/FeatureAssessment.Core.Tests/Clients/LlmClientFactoryTests.cs`** - Factory tests
-   - Test factory creates Ollama kernel when configured
-   - Test factory creates Anthropic kernel when configured
-   - Test factory throws on unsupported provider
+   namespace FeatureAssessment.Core.Clients;
+
+   /// <summary>
+   /// Helper to integrate IChatClient with Semantic Kernel
+   /// </summary>
+   public static class SemanticKernelHelper
+   {
+       public static Kernel CreateKernelFromChatClient(
+           IChatClient chatClient,
+           IServiceProvider serviceProvider)
+       {
+           var builder = Kernel.CreateBuilder();
+
+           // Add IChatClient as chat completion service
+           // Semantic Kernel supports IChatClient integration
+           builder.AddChatCompletionService(chatClient, serviceProvider);
+
+           // Add any plugins/tools
+           return builder.Build();
+       }
+   }
+   ```
+
+**Test Files:**
+
+8. **`tests/FeatureAssessment.Core.Tests/Configuration/AnthropicConfigurationValidatorTests.cs`** - Validator tests
+   - Test valid Anthropic configurations pass validation
+   - Test missing API key fails with clear error message
+   - Test empty model name fails validation
+   - Test negative timeout fails validation
+   - Test negative max retries fails validation
+
+9. **`tests/FeatureAssessment.Core.Tests/Clients/ChatClientFactoryTests.cs`** - Factory tests
+   - Test factory creates Ollama IChatClient when configured
+   - Test factory creates Anthropic IChatClient when configured
+   - Test factory throws NotSupportedException for unknown provider
+   - Test CurrentProvider property returns correct value
+   - Mock configurations with IOptions<T>
 
 10. **`tests/FeatureAssessment.Core.Tests/Integration/AnthropicEndToEndTests.cs`** - E2E tests with Anthropic
     - Mark with `[TestCategory("Integration")]`
+    - Requires environment variable: `ANTHROPIC_API_KEY`
     - Test feature lookup with Claude Haiku 4.5
-    - Test tool calling works correctly
-    - Test all existing scenarios (feature identification, environment extraction, error handling)
+    - Test tool calling (list_all_features, get_feature_metadata)
+    - Test feature identification by JIRA key
+    - Test feature identification by name (fuzzy match)
+    - Test environment extraction (Production, UAT)
+    - Test error handling (non-existent feature)
+    - Test tracing with Anthropic provider
 
 11. **`tests/FeatureAssessment.Core.Tests/Integration/OllamaEndToEndTests.cs`** - Update existing tests
     - Ensure tests explicitly configure Ollama provider
     - Verify no regressions from adding Anthropic support
+    - Tests should still pass with Ollama as provider
 
 **Configuration Files:**
 
-12. **`appsettings.json`** (or equivalent) - Update configuration structure
+12. **`src/FeatureAssessment.Core/appsettings.json`** - Base configuration (committed)
     ```json
     {
       "LlmProvider": {
-        "Provider": "Anthropic",
-        "Anthropic": {
-          "ApiKey": "",  // Load from environment variable ANTHROPIC_API_KEY
-          "ModelName": "claude-haiku-4-5",
-          "TimeoutSeconds": 30,
-          "MaxRetries": 3,
-          "ApiEndpoint": "https://api.anthropic.com"
-        },
-        "Ollama": {
-          "Endpoint": "http://localhost:11434",
-          "ModelName": "llama3.1:8b",
-          "TimeoutSeconds": 30,
-          "MaxRetries": 3
-        }
+        "Provider": "Anthropic"
+      },
+      "Anthropic": {
+        "ApiKey": "",  // Empty in committed file
+        "ModelName": "claude-haiku-4-5",
+        "TimeoutSeconds": 30,
+        "MaxRetries": 3,
+        "MaxTokens": 4096
+      },
+      "Ollama": {
+        "Endpoint": "http://localhost:11434",
+        "ModelName": "llama3.1:8b",
+        "TimeoutSeconds": 30,
+        "MaxRetries": 3
       }
     }
     ```
 
+13. **`src/FeatureAssessment.Core/appsettings.Development.template.json`** - Developer template (committed)
+    ```json
+    {
+      "// INSTRUCTIONS": "Copy this file to appsettings.Development.local.json and add your API key",
+      "// Get API key from": "https://console.anthropic.com",
+
+      "Anthropic": {
+        "ApiKey": "YOUR_API_KEY_HERE"
+      }
+    }
+    ```
+
+14. **`.gitignore`** - Add local config files (update existing)
+    ```
+    # Local development configuration files (contain secrets)
+    appsettings.Development.local.json
+    appsettings.*.local.json
+
+    # User secrets already gitignored by default
+    ```
+
+15. **Configuration Loading Hierarchy** - Update Program.cs or Startup.cs
+    ```csharp
+    var builder = WebApplication.CreateBuilder(args);
+
+    // Configuration priority (highest to lowest):
+    // 1. Environment variables (production/CI-CD)
+    // 2. User Secrets (dotnet user-secrets)
+    // 3. appsettings.{Environment}.local.json (local dev with config file)
+    // 4. appsettings.{Environment}.json (environment defaults)
+    // 5. appsettings.json (base defaults)
+
+    builder.Configuration
+        .AddJsonFile("appsettings.json", optional: false)
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true)
+        .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.local.json", optional: true)
+        .AddUserSecrets<Program>(optional: true)
+        .AddEnvironmentVariables();
+    ```
+
+16. **API Key Setup - Three Options** (developers choose preferred method)
+
+    **Option A: Local Config File (Easiest for most developers)**
+    ```bash
+    # Copy template
+    cp src/FeatureAssessment.Core/appsettings.Development.template.json \
+       src/FeatureAssessment.Core/appsettings.Development.local.json
+
+    # Edit appsettings.Development.local.json and replace YOUR_API_KEY_HERE
+    # File is automatically gitignored - safe from accidental commits
+    ```
+
+    **Option B: User Secrets (Most secure, .NET standard)**
+    ```bash
+    dotnet user-secrets init --project src/FeatureAssessment.Core
+    dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-api03-..." --project src/FeatureAssessment.Core
+
+    # List to verify
+    dotnet user-secrets list --project src/FeatureAssessment.Core
+    ```
+
+    **Option C: Environment Variable (Production-like)**
+    ```bash
+    # Linux/macOS
+    export ANTHROPIC_API_KEY=sk-ant-api03-...
+
+    # Windows PowerShell
+    $env:ANTHROPIC_API_KEY="sk-ant-api03-..."
+
+    # Windows Command Prompt
+    set ANTHROPIC_API_KEY=sk-ant-api03-...
+    ```
+
 **Documentation Updates:**
 
-13. **`TESTING.md`** - Add Anthropic testing section
+14. **`TESTING.md`** - Add Anthropic testing section
     ```markdown
     ## Testing with Anthropic
 
     ### Prerequisites
     - Anthropic API key: Sign up at https://console.anthropic.com
-    - Set environment variable: `export ANTHROPIC_API_KEY=sk-ant-...`
     - Default model: `claude-haiku-4-5` (fast, cost-effective)
+    - Supported models: `claude-haiku-4-5`, `claude-sonnet-4-5`, `claude-opus-4-6`
 
-    ### Configuration
+    ### API Key Setup - Choose Your Method
+
+    **Option A: Local Config File (Easiest)**
     ```bash
-    # Set API key (required)
+    # 1. Copy the template file
+    cp src/FeatureAssessment.Core/appsettings.Development.template.json \
+       src/FeatureAssessment.Core/appsettings.Development.local.json
+
+    # 2. Edit appsettings.Development.local.json and add your API key
+    # 3. Done! (File is gitignored automatically)
+    ```
+
+    **Option B: .NET User Secrets (Most Secure)**
+    ```bash
+    dotnet user-secrets init --project src/FeatureAssessment.Core
+    dotnet user-secrets set "Anthropic:ApiKey" "sk-ant-api03-..." --project src/FeatureAssessment.Core
+
+    # Verify it's set
+    dotnet user-secrets list --project src/FeatureAssessment.Core
+    ```
+
+    **Option C: Environment Variable (Production-Like)**
+    ```bash
+    # Linux/macOS
     export ANTHROPIC_API_KEY=sk-ant-api03-...
 
-    # Or on Windows PowerShell
+    # Windows PowerShell
     $env:ANTHROPIC_API_KEY="sk-ant-api03-..."
+
+    # Windows Command Prompt
+    set ANTHROPIC_API_KEY=sk-ant-api03-...
     ```
+
+    **Priority Order** (if multiple are set):
+    1. Environment Variable (highest)
+    2. User Secrets
+    3. appsettings.Development.local.json
+    4. appsettings.json (lowest)
 
     ### Running Tests with Anthropic
     ```bash
-    # Run integration tests with Anthropic (requires API key)
+    # Verify API key is set
+    echo $ANTHROPIC_API_KEY  # Linux/macOS
+    echo %ANTHROPIC_API_KEY%  # Windows CMD
+    $env:ANTHROPIC_API_KEY  # Windows PowerShell
+
+    # Run all integration tests (includes Anthropic)
     dotnet test --filter "Category=Integration"
 
     # Run only Anthropic-specific tests
     dotnet test --filter "FullyQualifiedName~Anthropic"
+
+    # Run unit tests only (no API calls)
+    dotnet test --filter "Category!=Integration"
     ```
 
     ### Switching Between Providers
-    - **Anthropic** (default): Production use, cloud-based, requires API key
-    - **Ollama**: Local development, no API key required, requires local setup
 
-    ### Cost Considerations
-    - Claude Haiku 4.5: ~$0.25 per million input tokens, ~$1.25 per million output tokens
-    - Integration tests make ~5-10 API calls
-    - Estimated cost per test run: < $0.01
+    Update `appsettings.json` or use environment-specific config:
+
+    **Anthropic (default):**
+    ```json
+    {
+      "LlmProvider": {
+        "Provider": "Anthropic"
+      }
+    }
     ```
 
-14. **`tests/FeatureAssessment.TestHarness/README.md`** - Update harness documentation
+    **Ollama:**
+    ```json
+    {
+      "LlmProvider": {
+        "Provider": "Ollama"
+      }
+    }
+    ```
+
+    ### Cost Considerations
+    - **Claude Haiku 4.5**: ~$0.25 per million input tokens, ~$1.25 per million output tokens
+    - **Claude Sonnet 4.5**: ~$3 per million input tokens, ~$15 per million output tokens
+    - **Claude Opus 4.6**: ~$15 per million input tokens, ~$75 per million output tokens
+    - Integration tests make ~5-10 API calls per test run
+    - Estimated cost per full test suite run: **< $0.01** (with Haiku)
+
+    ### Troubleshooting
+
+    **Error: "Anthropic API key is required"**
+    - Verify `ANTHROPIC_API_KEY` environment variable is set
+    - Or verify User Secrets are configured: `dotnet user-secrets list --project src/FeatureAssessment.Core`
+
+    **Error: "Authentication failed"**
+    - Check API key format (should start with `sk-ant-api03-`)
+    - Verify API key is valid at https://console.anthropic.com
+
+    **Error: "Model not found"**
+    - Verify model name in configuration matches available models
+    - Check Anthropic documentation for current model names
+    ```
+
+15. **`tests/FeatureAssessment.TestHarness/README.md`** - Update harness documentation
     - Add instructions for testing with Anthropic
     - Add command-line flag usage: `--provider anthropic` or `--provider ollama`
     - Document environment variable requirements
+    - Add example session with both providers
 
-**Package Dependencies:**
+**Package Dependencies (CONFIRMED AVAILABLE):**
 
 ```bash
-# Add Anthropic SDK to Core project
-dotnet add src/FeatureAssessment.Core package Anthropic.SDK
-# OR if using Semantic Kernel's Anthropic connector (when available)
-dotnet add src/FeatureAssessment.Core package Microsoft.SemanticKernel.Connectors.Anthropic
+# Official Anthropic SDK (version 10+)
+dotnet add src/FeatureAssessment.Core package Anthropic
 
-# Note: As of early 2026, Semantic Kernel may not have official Anthropic connector
-# In that case, use Anthropic SDK directly or community connectors
+# Microsoft.Extensions.AI abstractions (stable)
+dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.AI.Abstractions
+dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.AI
+
+# Note: No official Microsoft.SemanticKernel.Connectors.Anthropic exists
+# Instead, use official Anthropic SDK with IChatClient integration
 ```
 
-#### Technical Decisions
+#### Technical Decisions (UPDATED BASED ON RESEARCH)
+
+**SDK Selection:**
+- Use **official Anthropic SDK** (package: `Anthropic`, version 10+)
+  - Maintained by Anthropic directly
+  - Full support for Microsoft.Extensions.AI IChatClient
+  - Better long-term support and updates
+  - `.AsIChatClient()` and `.UseFunctionInvocation()` built-in
+
+**Integration Architecture:**
+- Use `Microsoft.Extensions.AI.Abstractions` as the common interface layer
+  - `IChatClient` provides provider-agnostic abstraction
+  - Both Ollama and Anthropic expose IChatClient implementations
+  - Semantic Kernel can consume IChatClient directly
+  - No custom adapters needed
 
 **Default Provider:**
 - **Anthropic (Claude Haiku 4.5)** is the default for production use
   - Reasons: Deterministic, reliable tool calling, well-documented API
-  - Cost-effective with Haiku model
+  - Cost-effective with Haiku model (~$0.25/M input tokens, ~$1.25/M output tokens)
   - Better performance than most local LLMs
+  - Native tool calling support (no hacks needed)
 - **Ollama** remains available for local development and testing without API costs
 
-**API Key Management:**
-- API key MUST be loaded from environment variable (`ANTHROPIC_API_KEY`)
-- NEVER hardcode or commit API keys to version control
-- Fail fast at startup if Anthropic is configured but API key is missing
-- Log warnings if API key looks invalid (wrong format)
+**API Key Management (Hybrid Approach):**
+- **Three methods supported** (developer's choice):
+  1. Local config file (`appsettings.Development.local.json`) - gitignored
+  2. .NET User Secrets - stored outside project directory
+  3. Environment variables - production/CI-CD standard
+- **Configuration hierarchy**:
+  - Environment variables override everything (production)
+  - User Secrets override config files (developer preference)
+  - `.local.json` files override base config (developer preference)
+  - Base `appsettings.json` has empty/placeholder values
+- **Template file** committed: `appsettings.Development.template.json`
+- **NEVER** commit actual API keys to version control
+- **Fail fast** at startup if Anthropic is configured but API key is missing
+- **Validate** API key format (starts with `sk-ant-`)
 
 **Provider Abstraction Strategy:**
-- Use Factory pattern (`ILlmClientFactory`) to create appropriate LLM client
-- Agent code remains provider-agnostic (no if/else for provider logic)
+- Use Factory pattern (`IChatClientFactory`) returning `IChatClient`
+- Agent code remains provider-agnostic (accepts `IChatClient`, not specific provider)
 - Configuration determines provider selection at runtime
-- Easy to add more providers in future (Azure OpenAI, Bedrock, etc.)
+- Easy to add more providers in future (Azure OpenAI, AWS Bedrock, etc.)
+- No if/else logic in agent code for provider-specific behavior
 
 **Tool Calling Compatibility:**
-- Anthropic's tool calling uses different format than OpenAI/Ollama
-- Semantic Kernel abstracts differences (if using SK connectors)
-- If using Anthropic SDK directly, implement adapter for tool calling
+- Official Anthropic SDK handles tool calling format internally
+- `.UseFunctionInvocation()` enables automatic tool/function calling
+- Semantic Kernel's plugin system works transparently with IChatClient
+- No manual tool format conversion needed
 - Test extensively to ensure feature lookup tools work correctly
 
 **Testing Strategy:**

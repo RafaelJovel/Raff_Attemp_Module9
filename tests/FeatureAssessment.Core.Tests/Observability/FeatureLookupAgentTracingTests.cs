@@ -1,20 +1,22 @@
 using System.Diagnostics;
 using FeatureAssessment.Core.Agents;
+using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Observability;
+using FeatureAssessment.Core.Tests.Helpers;
 using FeatureAssessment.Core.Tools;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Moq;
 
 namespace FeatureAssessment.Core.Tests.Observability;
 
 [TestClass]
+[DoNotParallelize]
 public class FeatureLookupAgentTracingTests
 {
     private Mock<IFeatureLookupTools> _mockTools = null!;
-    private Mock<IOptions<OllamaConfiguration>> _mockConfigOptions = null!;
+    private Mock<IKernelFactory> _mockKernelFactory = null!;
     private Mock<ILogger<FeatureLookupAgent>> _mockLogger = null!;
     private List<Activity> _capturedActivities = null!;
     private ActivityListener _activityListener = null!;
@@ -23,20 +25,11 @@ public class FeatureLookupAgentTracingTests
     public void Setup()
     {
         _mockTools = new Mock<IFeatureLookupTools>();
-        _mockConfigOptions = new Mock<IOptions<OllamaConfiguration>>();
         _mockLogger = new Mock<ILogger<FeatureLookupAgent>>();
+        _mockKernelFactory = MockKernelFactoryHelper.CreateMockFactory(_mockTools);
 
         // Ensure clean state - clear any existing activities
         _capturedActivities = new List<Activity>();
-
-        // Setup default configuration
-        _mockConfigOptions.Setup(x => x.Value).Returns(new OllamaConfiguration
-        {
-            Endpoint = "http://localhost:11434/v1",
-            ModelName = "qwen2.5:0.5b",
-            Temperature = 0.0,
-            MaxTokens = 500
-        });
 
         // Setup ActivityListener to capture activities
         // NOTE: Must filter in Sample callback to properly exclude Semantic Kernel's internal activities
@@ -80,7 +73,7 @@ public class FeatureLookupAgentTracingTests
     {
         // Arrange
         var query = "Is PLAT-1523 ready for production?";
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act
         // Note: This will fail at runtime because Ollama isn't configured,
@@ -106,7 +99,7 @@ public class FeatureLookupAgentTracingTests
     {
         // Arrange
         var query = "Check maintenance scheduling for UAT";
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act
         try
@@ -134,7 +127,7 @@ public class FeatureLookupAgentTracingTests
     {
         // Arrange
         var query = "Test query";
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act
         try
@@ -165,7 +158,7 @@ public class FeatureLookupAgentTracingTests
         _mockTools.Setup(x => x.ListAllFeaturesAsync())
             .Throws(new InvalidOperationException("Test exception"));
 
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act
         var result = await agent.LookupFeatureAsync(query);
@@ -209,7 +202,7 @@ public class FeatureLookupAgentTracingTests
             })
             .ReturnsAsync([]);
 
-        var agent = new FeatureLookupAgent(_mockTools.Object, _mockConfigOptions.Object, _mockLogger.Object);
+        var agent = new FeatureLookupAgent(_mockKernelFactory.Object, _mockLogger.Object);
 
         // Act
         var result = await agent.LookupFeatureAsync(query);

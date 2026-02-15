@@ -220,6 +220,6 @@ public class FeatureLookupTools : IFeatureLookupTools
             userElement.GetProperty("accountId").GetString() ?? string.Empty,
             userElement.GetProperty("displayName").GetString() ?? string.Empty,
             userElement.TryGetProperty("emailAddress", out var emailElement) ? emailElement.GetString() : null,
-            userElement.GetProperty("active").GetBoolean());
+            userElement.TryGetProperty("active", out var activeElement) && activeElement.GetBoolean());
     }
 }

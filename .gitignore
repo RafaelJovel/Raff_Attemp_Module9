@@ -135,6 +135,9 @@ out/
 *.env
 appsettings.Development.json
 appsettings.Local.json
+# Local configuration files with API keys (gitignored for safety)
+*.local.json
+appsettings.*.local.json
 
 # OS generated files
 .DS_Store
