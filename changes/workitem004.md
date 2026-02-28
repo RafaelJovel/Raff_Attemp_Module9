@@ -102,7 +102,7 @@ Run the graph and examine traces:
 
 ### Task 1: DocumentationTools - Core Implementation
 
-**Status**: 🔵 IN PROGRESS (PLAN stage)
+**Status**: ✅ COMPLETED
 
 **Acceptance Criteria (Given-When-Then):**
 
@@ -175,6 +175,8 @@ Modified files:
 
 **Test Strategy:**
 
+The same pattern of unit tests plus integration tests will be followed to ensure consistency with Task 1.
+
 Unit tests (mocked tools):
 1. `AssessAsync_ListsAllDocs_ThenReadsRelevant` — Mock tools, verify both calls made
 2. `AssessAsync_ReturnsFactsOnly_NoJudgment` — Response mentions docs present/missing, no "blocker" language
@@ -184,6 +186,10 @@ Unit tests (mocked tools):
 Integration tests (real Anthropic LLM):
 5. `DocumentationAgent_WithAnthropic_AssessesFeature1` — Real query, verifies response quality
 6. `DocumentationAgent_WithAnthropic_CreatesActivityWithTags` — Activity has feature_id and query tags
+
+> **Note on testing scope:**
+> - Path resolution is not a concern for Task 2 since the agent will rely on the already-validated `DocumentationTools` implementation.
+> - Nested trace/span verification is **not required** at this stage; it will be addressed explicitly in later tasks (Task 4) when end-to-end workflows and observability are tested.  Unit/integration tests here may capture basic activity creation, but deep trace nesting will be left for the E2E tests.
 
 **File Changes:**
 
