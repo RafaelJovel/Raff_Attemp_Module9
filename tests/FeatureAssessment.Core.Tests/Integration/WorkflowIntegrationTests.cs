@@ -84,13 +84,13 @@ public class WorkflowIntegrationTests
 
         // Lookup agent — uses kernel with FeatureLookup tools
         var lookupKernelFactory = new KernelFactory(
-            providerConfig, ollamaConfig, anthropicConfig, tools, mockKFLogger.Object);
+            providerConfig, ollamaConfig, anthropicConfig, tools, null, mockKFLogger.Object);
         var lookupAgent = new FeatureLookupAgent(
             lookupKernelFactory, new Mock<ILogger<FeatureLookupAgent>>().Object);
 
         // Coordinator agent — uses kernel without tools
         var coordinatorKernelFactory = new KernelFactory(
-            providerConfig, ollamaConfig, anthropicConfig, null, mockKFLogger.Object);
+            providerConfig, ollamaConfig, anthropicConfig, null, null, mockKFLogger.Object);
         var coordinatorAgent = new CoordinatorAgent(
             coordinatorKernelFactory, new Mock<ILogger<CoordinatorAgent>>().Object);
 

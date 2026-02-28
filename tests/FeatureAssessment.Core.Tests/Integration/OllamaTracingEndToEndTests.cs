@@ -73,7 +73,7 @@ public class OllamaTracingEndToEndTests
         var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
 
         // Create KernelFactory and Agent
-        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, mockKernelFactoryLogger.Object);
+        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, null, mockKernelFactoryLogger.Object);
         var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         var query = "Is PLAT-1523 ready for production?";
@@ -147,7 +147,7 @@ public class OllamaTracingEndToEndTests
         var mockKernelFactoryLogger = new Mock<ILogger<KernelFactory>>();
 
         // Create KernelFactory and Agent
-        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, mockKernelFactoryLogger.Object);
+        var kernelFactory = new KernelFactory(providerConfig, ollamaConfig, anthropicConfig, tools, null, mockKernelFactoryLogger.Object);
         var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
 
         var query = "Is feature NONEXISTENT-999 ready?";

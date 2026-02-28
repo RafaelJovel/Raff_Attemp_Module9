@@ -59,6 +59,7 @@ public class OllamaEndToEndTests
             _ollamaConfigOptions,
             _anthropicConfigOptions,
             _mockTools.Object,
+            null,
             _mockKernelFactoryLogger.Object);
 
         // Note: Mock tool setup omitted - these tests focus on configuration and state management

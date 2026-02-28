@@ -53,4 +53,13 @@ public static class ActivitySources
         $"{ServiceName}.Specialists",
         Version
     );
+
+    /// <summary>
+    /// ActivitySource specifically for the Documentation Specialist agent.
+    /// This allows traces to filter on documentation assessments separately.
+    /// </summary>
+    public static readonly ActivitySource DocumentationSpecialist = new(
+        $"{ServiceName}.Specialists.Documentation",
+        Version
+    );
 }

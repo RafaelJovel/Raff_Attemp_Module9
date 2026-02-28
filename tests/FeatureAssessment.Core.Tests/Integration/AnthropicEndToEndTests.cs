@@ -69,6 +69,7 @@ public class AnthropicEndToEndTests
             ollamaConfig,
             anthropicConfig,
             _tools,
+            null,
             mockKernelFactoryLogger.Object);
 
         _capturedActivities = new List<Activity>();

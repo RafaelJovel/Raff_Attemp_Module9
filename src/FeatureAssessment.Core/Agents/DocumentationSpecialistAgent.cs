@@ -1,4 +1,6 @@
 using System;
+using System.Diagnostics;
+using FeatureAssessment.Core.Observability;
 using System.Text;
 using System.Threading.Tasks;
 using FeatureAssessment.Core.Tools;
@@ -19,6 +21,14 @@ namespace FeatureAssessment.Core.Agents
 
         public async Task<string> AssessAsync(string query, string featureId)
         {
+            // start a tracing activity for the specialist
+            using var activity = ActivitySources.DocumentationSpecialist.StartActivity("DocumentationSpecialistAgent.AssessAsync");
+            if (activity != null)
+            {
+                activity.SetTag("feature_id", featureId);
+                activity.SetTag("query", query);
+            }
+
             var sb = new StringBuilder();
             sb.AppendLine($"Assessment for feature: {featureId}");
             sb.AppendLine($"Query: {query}");

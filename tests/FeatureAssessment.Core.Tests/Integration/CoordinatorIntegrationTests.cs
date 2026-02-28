@@ -78,7 +78,7 @@ public class CoordinatorIntegrationTests
         // Pass null tools — coordinator does not use feature lookup tools
         _kernelFactory = new KernelFactory(
             providerConfig, ollamaConfig, anthropicConfig,
-            null, mockLogger.Object);
+            null, null, mockLogger.Object);
     }
 
     [TestMethod]

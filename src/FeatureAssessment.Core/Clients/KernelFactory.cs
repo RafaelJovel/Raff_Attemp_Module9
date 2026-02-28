@@ -20,6 +20,7 @@ public class KernelFactory : IKernelFactory
     private readonly IOptions<OllamaConfiguration> _ollamaConfig;
     private readonly IOptions<AnthropicConfiguration> _anthropicConfig;
     private readonly IFeatureLookupTools? _tools;
+    private readonly IDocumentationTools? _documentationTools;
     private readonly ILogger<KernelFactory> _logger;
 
     public KernelFactory(
@@ -27,12 +28,14 @@ public class KernelFactory : IKernelFactory
         IOptions<OllamaConfiguration> ollamaConfig,
         IOptions<AnthropicConfiguration> anthropicConfig,
         IFeatureLookupTools? tools,
+        IDocumentationTools? documentationTools,
         ILogger<KernelFactory> logger)
     {
         _providerConfig = providerConfig ?? throw new ArgumentNullException(nameof(providerConfig));
         _ollamaConfig = ollamaConfig ?? throw new ArgumentNullException(nameof(ollamaConfig));
         _anthropicConfig = anthropicConfig ?? throw new ArgumentNullException(nameof(anthropicConfig));
         _tools = tools; // null is valid — means no tools/plugins registered in the kernel
+        _documentationTools = documentationTools; // additional plugin
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 

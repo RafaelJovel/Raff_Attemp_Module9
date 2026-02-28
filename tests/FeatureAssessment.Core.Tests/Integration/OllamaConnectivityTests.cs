@@ -107,6 +107,7 @@ public class OllamaConnectivityTests
             ollamaConfigOptions,
             anthropicConfigOptions,
             mockTools.Object,
+            null,
             mockKernelFactoryLogger.Object);
 
         var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
@@ -161,6 +162,7 @@ public class OllamaConnectivityTests
             ollamaConfigOptions,
             anthropicConfigOptions,
             tools,
+            null,
             mockKernelFactoryLogger.Object);
 
         var agent = new FeatureLookupAgent(kernelFactory, mockAgentLogger.Object);
