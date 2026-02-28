@@ -1,6 +1,17 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+**🔴 MANDATORY SESSION INITIALIZATION**
+
+**Every new chat session MUST start with these steps:**
+1. Open [WORKFLOW_STATUS.md](WORKFLOW_STATUS.md)
+2. Read the "Active Work Item" section (session checkpoint)
+3. State the current state to the user
+4. Validate it matches the work item file
+5. Wait for user direction before proceeding
+
+**The "Active Work Item" section is your checkpoint.** If it looks wrong, STOP and ask the user before proceeding.
+
+---
 
 ## Repository Purpose
 

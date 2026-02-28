@@ -217,12 +217,49 @@ public class ConsoleOutputHelper
                     "Run scenarios by category",
                     "Run single scenario",
                     "Enter custom query",
+                    "Run coordinator assessment",
                     "Show configuration",
                     "Exit"
                 })
         );
 
         return choice;
+    }
+
+    /// <summary>
+    /// Display the result of a coordinator assessment (full pipeline state).
+    /// </summary>
+    public void DisplayCoordinatorResult(FeatureAssessment.Core.Models.AssessmentState state, TimeSpan elapsed)
+    {
+        var stageColor = state.CurrentStage == "coordinator_completed" ? "green" : "red";
+        var stageIcon = state.CurrentStage == "coordinator_completed" ? "✓" : "✗";
+
+        var table = new Table()
+            .Border(TableBorder.Square)
+            .BorderColor(state.CurrentStage == "coordinator_completed" ? Color.Green : Color.Red)
+            .AddColumn(new TableColumn("[bold]Field[/]"))
+            .AddColumn(new TableColumn("[bold]Value[/]"));
+
+        table.AddRow("Stage", $"[{stageColor}]{stageIcon} {state.CurrentStage}[/]");
+        table.AddRow("Feature Key", $"[cyan]{state.FeatureKey ?? "N/A"}[/]");
+        table.AddRow("Feature ID", $"[cyan]{state.FeatureId ?? "N/A"}[/]");
+        table.AddRow("Target Environment", $"[cyan]{state.TargetEnvironment ?? "N/A"}[/]");
+        table.AddRow("Execution Time", $"[yellow]{elapsed.TotalSeconds:F2}s[/]");
+
+        AnsiConsole.Write(table);
+
+        if (!string.IsNullOrEmpty(state.CoordinatorResponse))
+        {
+            AnsiConsole.WriteLine();
+            AnsiConsole.Write(
+                new Panel(new Markup(Markup.Escape(state.CoordinatorResponse)))
+                    .Header("[bold yellow]Coordinator Response[/]")
+                    .BorderColor(Color.Yellow)
+                    .Padding(new Padding(1, 0))
+            );
+        }
+
+        AnsiConsole.WriteLine();
     }
 
     /// <summary>

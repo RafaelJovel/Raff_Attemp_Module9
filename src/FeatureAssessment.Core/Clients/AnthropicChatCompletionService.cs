@@ -210,24 +210,40 @@ internal class AnthropicChatCompletionService : IChatCompletionService
                 iteration++;
                 _logger.LogDebug("Anthropic API call iteration {Iteration}", iteration);
 
-                // Build API request
-                var apiRequest = new
+                // Build API request — omit "tools" entirely when null to avoid Anthropic 400 errors
+                string requestJson;
+                if (toolsProp != null)
                 {
-                    model = modelProp,
-                    max_tokens = maxTokensProp ?? _maxTokens,
-                    temperature = temperatureProp ?? _temperature,
-                    system = systemProp,
-                    messages = messages,
-                    tools = toolsProp
-                };
+                    var apiRequestWithTools = new
+                    {
+                        model = modelProp,
+                        max_tokens = maxTokensProp ?? _maxTokens,
+                        temperature = temperatureProp ?? _temperature,
+                        system = systemProp,
+                        messages = messages,
+                        tools = toolsProp
+                    };
+                    requestJson = JsonSerializer.Serialize(apiRequestWithTools);
+                }
+                else
+                {
+                    var apiRequestNoTools = new
+                    {
+                        model = modelProp,
+                        max_tokens = maxTokensProp ?? _maxTokens,
+                        temperature = temperatureProp ?? _temperature,
+                        system = systemProp,
+                        messages = messages
+                    };
+                    requestJson = JsonSerializer.Serialize(apiRequestNoTools);
+                }
 
                 var content = new StringContent(
-                    JsonSerializer.Serialize(apiRequest),
+                    requestJson,
                     Encoding.UTF8,
                     "application/json");
 
-                _logger.LogDebug("Sending request to Anthropic API: {Request}",
-                    JsonSerializer.Serialize(apiRequest, new JsonSerializerOptions { WriteIndented = false }));
+                _logger.LogDebug("Sending request to Anthropic API: {Request}", requestJson);
 
                 var response = await httpClient.PostAsync(
                     "https://api.anthropic.com/v1/messages",

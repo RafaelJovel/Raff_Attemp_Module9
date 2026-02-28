@@ -1,9 +1,12 @@
 using System.Diagnostics;
 using FeatureAssessment.Core.Agents;
+using Spectre.Console;
 using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Configuration;
+using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Tools;
+using FeatureAssessment.Core.Workflow;
 using FeatureAssessment.TestHarness;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -13,10 +16,17 @@ using OpenTelemetry;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 
+// Locate the src-level local config (same file used by integration tests, gitignored)
+// Path: bin/Debug/net10.0 → up 5 levels → repo root → src/FeatureAssessment.Core/
+var srcLocalConfig = Path.GetFullPath(Path.Combine(
+    AppContext.BaseDirectory, "..", "..", "..", "..", "..",
+    "src", "FeatureAssessment.Core", "appsettings.Development.local.json"));
+
 // Build configuration
 var configuration = new ConfigurationBuilder()
     .SetBasePath(AppContext.BaseDirectory)
     .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+    .AddJsonFile(srcLocalConfig, optional: true, reloadOnChange: false)  // local API keys (gitignored)
     .AddEnvironmentVariables()
     .Build();
 
@@ -43,6 +53,8 @@ var dataDirectory = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, ".."
 services.AddSingleton<IFeatureLookupTools>(sp => new FeatureLookupTools(dataDirectory));
 services.AddSingleton<IKernelFactory, KernelFactory>();
 services.AddSingleton<IFeatureLookupAgent, FeatureLookupAgent>();
+services.AddSingleton<ICoordinatorAgent, CoordinatorAgent>();
+services.AddSingleton<IAssessmentWorkflow, AssessmentWorkflow>();
 services.AddSingleton<ConsoleOutputHelper>();
 
 // Configure OpenTelemetry with console exporter
@@ -52,6 +64,7 @@ services.AddOpenTelemetry()
     .WithTracing(builder => builder
         .AddSource(ActivitySources.FeatureLookup.Name)
         .AddSource(ActivitySources.Tools.Name)
+        .AddSource(ActivitySources.Coordinator.Name)
         .AddConsoleExporter());
 
 // Configure logging from appsettings.json (console + file)
@@ -121,6 +134,7 @@ return 0;
 static async Task RunInteractiveLoop(ServiceProvider serviceProvider)
 {
     var agent = serviceProvider.GetRequiredService<IFeatureLookupAgent>();
+    var workflow = serviceProvider.GetRequiredService<IAssessmentWorkflow>();
     var outputHelper = serviceProvider.GetRequiredService<ConsoleOutputHelper>();
 
     outputHelper.DisplayWelcomeBanner();
@@ -148,6 +162,10 @@ static async Task RunInteractiveLoop(ServiceProvider serviceProvider)
 
                 case "Enter custom query":
                     await RunCustomQuery(agent, outputHelper);
+                    break;
+
+                case "Run coordinator assessment":
+                    await RunCoordinatorAssessment(workflow, outputHelper);
                     break;
 
                 case "Show configuration":
@@ -229,6 +247,33 @@ static async Task RunSingleScenario(IFeatureLookupAgent agent, ConsoleOutputHelp
     var selectedScenario = outputHelper.SelectScenario(scenarios);
 
     await ExecuteScenario(agent, outputHelper, selectedCategory, selectedScenario);
+}
+
+static async Task RunCoordinatorAssessment(
+    IAssessmentWorkflow workflow,
+    ConsoleOutputHelper outputHelper)
+{
+    var query = outputHelper.PromptForCustomQuery();
+
+    outputHelper.DisplayScenarioHeader("Coordinator Assessment", "Full Pipeline: Lookup → Coordinator");
+    outputHelper.DisplayQuery(query);
+
+    var stopwatch = Stopwatch.StartNew();
+
+    try
+    {
+        var finalState = await outputHelper.WithSpinner(
+            "Running assessment pipeline (Lookup → Coordinator)...",
+            () => workflow.RunAsync(query, CancellationToken.None));
+
+        stopwatch.Stop();
+        outputHelper.DisplayCoordinatorResult(finalState, stopwatch.Elapsed);
+    }
+    catch (Exception ex)
+    {
+        stopwatch.Stop();
+        outputHelper.DisplayError($"Pipeline failed after {stopwatch.Elapsed.TotalSeconds:F2}s", ex);
+    }
 }
 
 static async Task RunCustomQuery(IFeatureLookupAgent agent, ConsoleOutputHelper outputHelper)

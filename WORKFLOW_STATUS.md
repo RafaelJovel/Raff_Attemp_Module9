@@ -311,17 +311,54 @@ The assistant MUST update this "Current Status" section BEFORE taking any action
 
 **Failure to Update = System Error**: Failing to keep this section synchronized is a HIGH PRIORITY violation that compromises work continuity after memory resets.
 
+### Completed Work Items
+- ✅ **workitem002** — Create the Feature Lookup Agent (6/6 tasks complete)
+  - Completion Summary: [workitem002-COMPLETE.md](workitem002-COMPLETE.md)
+
 ### Active Work Item
-- **Work Item File**: `changes/workitem001.md` - Feature Readiness Assessment System Prerequisites
-- **Current Task**: All tasks complete (Tasks 1-4)
-- **Current Stage**: Work item complete, ready for final commit
-- **Last Updated**: 2026-02-14
+
+⚠️ **SESSION INITIALIZATION CHECKPOINT** — Read this first in every new chat session
+
+**Current State:**
+- **Work Item File**: `changes/workitem003.md` — Create the Coordinator Agent (Supervisor)
+- **Current Task**: Task 2 — AssessmentWorkflow end-to-end orchestration
+- **Current Stage**: COMMIT & PICK NEXT
+- **Last Updated**: 2026-02-28
+
+**Valid Actions in COMMIT & PICK NEXT Stage:**
+- ✅ Create commits with conventional commit messages
+- ✅ Select and plan the next Given-When-Then task
+- ✅ Update work item file with next task details
+- ❌ CANNOT: Write code or run tests
+- ❌ CANNOT: Start new task planning (belongs to PLAN stage)
+- ❌ CANNOT: Change to different stage
+
+**Stage Gate Quick Reference:**
+
+| Stage | Can Do | Cannot Do |
+|-------|--------|-----------|
+| PLAN | Discuss strategy, analyze files, plan | Write code, run tests, commit |
+| BUILD & ASSESS | Write code, run tests, validate | Change stage, commit, plan next |
+| REFLECT & ADAPT | Discuss process, assess future | Write code, commit |
+| COMMIT & PICK NEXT | Commit, select next task | Write code, change stage |
+
+**To Transition to Next Stage:**
+User must explicitly say one of:
+- "move to COMMIT & PICK NEXT"
+- "ready to commit"
+- "let's make the commit"
+- (or similar explicit language indicating stage transition)
+
+**Session Validation:**
+Before proceeding in ANY new chat:
+1. ✓ Confirm: Current Stage is REFLECT & ADAPT
+2. ✓ Confirm: workitem003.md task 2 matches above
+3. ✓ Confirm: Last Updated matches today's date
+4. If ANY mismatch: STOP and ask user before proceeding
 
 ### When Active
-When working on a story, this section will show:
-- **Work Item File**: `changes/XXX-story-name.md` (link to active working document)
-- **Current Task**: Task number and brief description from acceptance criteria
+When working on a story, Active Work Item section shows:
+- **Work Item File**: Path to active working document
+- **Current Task**: Task number and brief description
 - **Current Stage**: PLAN / BUILD & ASSESS / REFLECT & ADAPT / COMMIT & PICK NEXT
-- **Last Updated**: YYYY-MM-DD
-
-*All detailed tracking lives in the individual work item file. This status section only provides lightweight pointers.*
+- **Last Updated**: Date of last status update

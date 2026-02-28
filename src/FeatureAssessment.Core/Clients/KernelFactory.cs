@@ -19,20 +19,20 @@ public class KernelFactory : IKernelFactory
     private readonly IOptions<LlmProviderConfiguration> _providerConfig;
     private readonly IOptions<OllamaConfiguration> _ollamaConfig;
     private readonly IOptions<AnthropicConfiguration> _anthropicConfig;
-    private readonly IFeatureLookupTools _tools;
+    private readonly IFeatureLookupTools? _tools;
     private readonly ILogger<KernelFactory> _logger;
 
     public KernelFactory(
         IOptions<LlmProviderConfiguration> providerConfig,
         IOptions<OllamaConfiguration> ollamaConfig,
         IOptions<AnthropicConfiguration> anthropicConfig,
-        IFeatureLookupTools tools,
+        IFeatureLookupTools? tools,
         ILogger<KernelFactory> logger)
     {
         _providerConfig = providerConfig ?? throw new ArgumentNullException(nameof(providerConfig));
         _ollamaConfig = ollamaConfig ?? throw new ArgumentNullException(nameof(ollamaConfig));
         _anthropicConfig = anthropicConfig ?? throw new ArgumentNullException(nameof(anthropicConfig));
-        _tools = tools ?? throw new ArgumentNullException(nameof(tools));
+        _tools = tools; // null is valid — means no tools/plugins registered in the kernel
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -65,8 +65,8 @@ public class KernelFactory : IKernelFactory
             modelId: config.ModelName,
             endpoint: new Uri(config.Endpoint.Replace("/v1", ""))); // Ollama connector doesn't need /v1 suffix
 
-        // Register feature lookup tools as a plugin
-        builder.Plugins.AddFromObject(_tools, "FeatureLookup");
+        if (_tools != null)
+            builder.Plugins.AddFromObject(_tools, "FeatureLookup");
 
         return builder.Build();
     }
@@ -92,8 +92,8 @@ public class KernelFactory : IKernelFactory
         // Add the Anthropic chat completion service to kernel
         builder.Services.AddSingleton<Microsoft.SemanticKernel.ChatCompletion.IChatCompletionService>(anthropicChatCompletion);
 
-        // Register feature lookup tools as a plugin
-        builder.Plugins.AddFromObject(_tools, "FeatureLookup");
+        if (_tools != null)
+            builder.Plugins.AddFromObject(_tools, "FeatureLookup");
 
         _logger.LogDebug("Anthropic kernel created successfully with IChatClient integration");
 
