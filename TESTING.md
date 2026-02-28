@@ -52,13 +52,13 @@ Run unit tests during development for fast feedback:
 
 ```bash
 # Run all unit tests (excludes integration tests)
-dotnet test --filter "Category!=Integration"
+dotnet test --filter "TestCategory!=Integration"
 
 # Run tests from project root
 dotnet test
 
 # Run with detailed output
-dotnet test --filter "Category!=Integration" --verbosity normal
+dotnet test --filter "TestCategory!=Integration" --verbosity normal
 ```
 
 ### Running All Tests (Including Integration)
@@ -76,7 +76,7 @@ dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
 
 ```bash
 # Unit tests only (fast, no external dependencies)
-dotnet test --filter "Category!=Integration"
+dotnet test --filter "TestCategory!=Integration"
 
 # Integration tests only (requires Ollama)
 dotnet test --filter "TestCategory=Integration"
@@ -253,7 +253,7 @@ jobs:
         run: dotnet restore
 
       - name: Run unit tests
-        run: dotnet test --filter "Category!=Integration" --no-restore --verbosity normal
+        run: dotnet test --filter "TestCategory!=Integration" --no-restore --verbosity normal
 
       - name: Upload test results
         if: always()
@@ -327,7 +327,7 @@ stages:
             displayName: 'Run unit tests'
             inputs:
               command: 'test'
-              arguments: '--filter "Category!=Integration" --no-restore --logger trx'
+              arguments: '--filter "TestCategory!=Integration" --no-restore --logger trx'
 
           - task: PublishTestResults@2
             condition: always()
@@ -474,7 +474,7 @@ dotnet list tests/FeatureAssessment.Core.Tests/FeatureAssessment.Core.Tests.cspr
 
 ```bash
 # 1. During active development (fast feedback)
-dotnet test --filter "Category!=Integration" --no-build
+dotnet test --filter "TestCategory!=Integration" --no-build
 
 # 2. Before committing (full validation)
 dotnet test
@@ -487,7 +487,7 @@ dotnet test /p:CollectCoverage=true
 
 ```bash
 # 1. Fast CI build (on every commit)
-dotnet test --filter "Category!=Integration"
+dotnet test --filter "TestCategory!=Integration"
 
 # 2. Full CI build (on PR to main)
 dotnet test

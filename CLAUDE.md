@@ -214,7 +214,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package FluentAssertions
 **Testing:**
 ```bash
 dotnet test  # Run all tests
-dotnet test --filter "Category!=Integration"  # Run unit tests only
+dotnet test --filter "TestCategory!=Integration"  # Run unit tests only
 dotnet test tests/FeatureAssessment.IntegrationTests  # Run integration tests
 dotnet test /p:CollectCoverage=true  # Run with coverage
 ```

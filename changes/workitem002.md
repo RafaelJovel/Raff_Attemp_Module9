@@ -284,7 +284,7 @@ dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.Logging.Abstr
     ### Running Tests
     ```bash
     # Unit tests only (fast, no external dependencies)
-    dotnet test --filter "Category!=Integration"
+    dotnet test --filter "TestCategory!=Integration"
 
     # All tests including integration (requires Ollama)
     dotnet test
@@ -509,7 +509,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package WireMock.Net
 12. Verify existing unit tests still pass
     - Run all unit tests (excluding integration)
     - Expected: No regressions from configuration changes
-    - Verify: `dotnet test --filter "Category!=Integration"` passes
+    - Verify: `dotnet test --filter "TestCategory!=Integration"` passes
 
 #### File Changes
 
@@ -648,7 +648,7 @@ dotnet add tests/FeatureAssessment.Core.Tests package OpenTelemetry.Exporter.Con
      -d '{"model":"qwen2.5:0.5b","messages":[{"role":"user","content":"test"}]}'
 
    # Run integration tests
-   dotnet test --filter "Category=Integration"
+   dotnet test --filter "TestCategory=Integration"
    ```
 
    ### Observability (NEW)
@@ -1408,13 +1408,13 @@ dotnet add src/FeatureAssessment.Core package Microsoft.Extensions.AI
     $env:ANTHROPIC_API_KEY  # Windows PowerShell
 
     # Run all integration tests (includes Anthropic)
-    dotnet test --filter "Category=Integration"
+    dotnet test --filter "TestCategory=Integration"
 
     # Run only Anthropic-specific tests
     dotnet test --filter "FullyQualifiedName~Anthropic"
 
     # Run unit tests only (no API calls)
-    dotnet test --filter "Category!=Integration"
+    dotnet test --filter "TestCategory!=Integration"
     ```
 
     ### Switching Between Providers

@@ -279,7 +279,7 @@ dotnet test
 dotnet test /p:CollectCoverage=true /p:CoverletOutputFormat=opencover
 
 # Run only unit tests (exclude integration)
-dotnet test --filter "Category!=Integration"
+dotnet test --filter "TestCategory!=Integration"
 
 # Run specific test project
 dotnet test tests/FeatureAssessment.Core.Tests

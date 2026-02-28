@@ -92,18 +92,18 @@ public class OllamaTracingEndToEndTests
 
         // Verify tags are set
         var queryTag = mainActivity.Tags.FirstOrDefault(t => t.Key == "query");
-        Assert.IsNotNull(queryTag, "Query tag should be set");
+        Assert.AreEqual("query", queryTag.Key, "Query tag should be set");
         Assert.AreEqual(query, queryTag.Value);
 
         var featureKeyTag = mainActivity.Tags.FirstOrDefault(t => t.Key == "feature_key");
-        Assert.IsNotNull(featureKeyTag, "Feature key tag should be set");
+        Assert.AreEqual("feature_key", featureKeyTag.Key, "Feature key tag should be set");
         Assert.IsFalse(string.IsNullOrEmpty(featureKeyTag.Value), "Feature key should have a value");
 
         var targetEnvTag = mainActivity.Tags.FirstOrDefault(t => t.Key == "target_environment");
-        Assert.IsNotNull(targetEnvTag, "Target environment tag should be set");
+        Assert.AreEqual("target_environment", targetEnvTag.Key, "Target environment tag should be set");
 
         var isSuccessTag = mainActivity.Tags.FirstOrDefault(t => t.Key == "is_success");
-        Assert.IsNotNull(isSuccessTag, "Success tag should be set");
+        Assert.AreEqual("is_success", isSuccessTag.Key, "Success tag should be set");
         Assert.AreEqual("True", isSuccessTag.Value, "Success tag should be true");
 
         // Verify no error status
@@ -168,7 +168,7 @@ public class OllamaTracingEndToEndTests
 
         // Verify query tag is set
         var queryTag = mainActivity.Tags.FirstOrDefault(t => t.Key == "query");
-        Assert.IsNotNull(queryTag, "Query tag should be set");
+        Assert.AreEqual("query", queryTag.Key, "Query tag should be set");
         Assert.AreEqual(query, queryTag.Value);
 
         Console.WriteLine($"Trace completed for non-existent feature:");

@@ -228,7 +228,7 @@ npm run type-check                                    # TypeScript validation
 npm run lint                                          # ESLint (if configured)
 
 # Before merging to main (run all tests including integration):
-dotnet test --filter "Category!=Integration"          # Fast unit tests during dev
+dotnet test --filter "TestCategory!=Integration"          # Fast unit tests during dev
 dotnet test                                           # All tests including integration
 npm test                                              # Frontend tests
 ```
@@ -314,8 +314,8 @@ The assistant MUST update this "Current Status" section BEFORE taking any action
 ### Active Work Item
 - **Work Item File**: `changes/workitem002.md` - Create the Feature Lookup Agent
 - **Current Task**: Task 6 - Anthropic LLM Support
-- **Current Stage**: BUILD & ASSESS
-- **Last Updated**: 2026-02-15
+- **Current Stage**: COMMIT & PICK NEXT
+- **Last Updated**: 2026-02-28
 
 ### When Active
 When working on a story, this section will show:

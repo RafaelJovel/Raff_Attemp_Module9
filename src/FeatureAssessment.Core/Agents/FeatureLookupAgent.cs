@@ -57,7 +57,7 @@ public class FeatureLookupAgent : IFeatureLookupAgent
             activity?.SetTag("feature_key", result.FeatureKey);
             activity?.SetTag("feature_id", result.FeatureId);
             activity?.SetTag("target_environment", result.TargetEnvironment);
-            activity?.SetTag("is_success", result.IsSuccess);
+            activity?.SetTag("is_success", result.IsSuccess.ToString());
 
             if (!result.IsSuccess && !string.IsNullOrEmpty(result.ErrorMessage))
             {

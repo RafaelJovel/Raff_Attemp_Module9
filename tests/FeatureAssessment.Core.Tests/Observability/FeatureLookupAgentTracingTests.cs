@@ -118,7 +118,7 @@ public class FeatureLookupAgentTracingTests
         Assert.IsNotNull(activity, "FeatureLookupAgent.LookupFeature activity with correct query should be created");
 
         var queryTag = activity.Tags.FirstOrDefault(t => t.Key == "query");
-        Assert.IsNotNull(queryTag, "Query tag should be set");
+        Assert.AreEqual("query", queryTag.Key, "Query tag should be set");
         Assert.AreEqual(query, queryTag.Value, "Query tag should match input query");
     }
 
@@ -144,7 +144,7 @@ public class FeatureLookupAgentTracingTests
         Assert.IsNotNull(activity, "FeatureLookupAgent.LookupFeature activity should be created");
 
         var serviceNameTag = activity.Tags.FirstOrDefault(t => t.Key == "service.name");
-        Assert.IsNotNull(serviceNameTag, "Service name tag should be set");
+        Assert.AreEqual("service.name", serviceNameTag.Key, "Service name tag should be set");
         Assert.AreEqual(ActivitySources.ServiceName, serviceNameTag.Value);
     }
 
@@ -180,8 +180,8 @@ public class FeatureLookupAgentTracingTests
         var exceptionTypeTag = activity.Tags.FirstOrDefault(t => t.Key == "exception.type");
         var exceptionMessageTag = activity.Tags.FirstOrDefault(t => t.Key == "exception.message");
 
-        Assert.IsNotNull(exceptionTypeTag, "Exception type should be recorded");
-        Assert.IsNotNull(exceptionMessageTag, "Exception message should be recorded");
+        Assert.AreEqual("exception.type", exceptionTypeTag.Key, "Exception type should be recorded");
+        Assert.AreEqual("exception.message", exceptionMessageTag.Key, "Exception message should be recorded");
     }
 
     [TestMethod]
