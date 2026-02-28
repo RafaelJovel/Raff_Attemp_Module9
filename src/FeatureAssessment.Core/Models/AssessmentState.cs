@@ -42,6 +42,13 @@ public record AssessmentState
     public string? ErrorMessage { get; init; }
 
     /// <summary>
+    /// The coordinator agent's response text.
+    /// Contains the preliminary assessment or final decision reasoning.
+    /// Null if coordinator has not yet run.
+    /// </summary>
+    public string? CoordinatorResponse { get; init; }
+
+    /// <summary>
     /// Additional metadata for the assessment.
     /// Allows extension without breaking changes.
     /// </summary>
@@ -73,6 +80,16 @@ public record AssessmentState
     public AssessmentState WithStage(string newStage)
     {
         return this with { CurrentStage = newStage };
+    }
+
+    /// <summary>
+    /// Sets the coordinator agent's response.
+    /// </summary>
+    /// <param name="response">The coordinator's response text.</param>
+    /// <returns>New AssessmentState with coordinator response set.</returns>
+    public AssessmentState WithCoordinatorResponse(string response)
+    {
+        return this with { CoordinatorResponse = response };
     }
 
     /// <summary>

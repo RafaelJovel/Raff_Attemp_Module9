@@ -164,7 +164,7 @@ New files:
 
 **Design Notes:**
 - `AssessmentWorkflow` injects `IFeatureLookupAgent` and `ICoordinatorAgent`
-- Workflow creates root activity via `ActivitySources.Coordinator` (parent span for the full assessment)
+- **Workflow creates a root span** via `ActivitySources.Coordinator` named `"AssessmentWorkflow.Run"` — this ensures both the feature lookup and coordinator activities appear as children of a single trace rather than as two separate root spans. This satisfies the workitem003 requirement for trace continuity across both agents.
 - If lookup fails (`IsFeatureIdentified=false`), coordinator is skipped and state returned with error
 - Workflow lives in `FeatureAssessment.Core.Workflow` namespace
 
