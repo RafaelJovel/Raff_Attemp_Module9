@@ -6,6 +6,7 @@ using FeatureAssessment.Core.Configuration;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Tools;
+using FeatureAssessment.Core.Workflow;
 using FeatureAssessment.TestHarness;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -53,6 +54,7 @@ services.AddSingleton<IFeatureLookupTools>(sp => new FeatureLookupTools(dataDire
 services.AddSingleton<IKernelFactory, KernelFactory>();
 services.AddSingleton<IFeatureLookupAgent, FeatureLookupAgent>();
 services.AddSingleton<ICoordinatorAgent, CoordinatorAgent>();
+services.AddSingleton<IAssessmentWorkflow, AssessmentWorkflow>();
 services.AddSingleton<ConsoleOutputHelper>();
 
 // Configure OpenTelemetry with console exporter
@@ -132,7 +134,7 @@ return 0;
 static async Task RunInteractiveLoop(ServiceProvider serviceProvider)
 {
     var agent = serviceProvider.GetRequiredService<IFeatureLookupAgent>();
-    var coordinator = serviceProvider.GetRequiredService<ICoordinatorAgent>();
+    var workflow = serviceProvider.GetRequiredService<IAssessmentWorkflow>();
     var outputHelper = serviceProvider.GetRequiredService<ConsoleOutputHelper>();
 
     outputHelper.DisplayWelcomeBanner();
@@ -163,7 +165,7 @@ static async Task RunInteractiveLoop(ServiceProvider serviceProvider)
                     break;
 
                 case "Run coordinator assessment":
-                    await RunCoordinatorAssessment(agent, coordinator, outputHelper);
+                    await RunCoordinatorAssessment(workflow, outputHelper);
                     break;
 
                 case "Show configuration":
@@ -248,8 +250,7 @@ static async Task RunSingleScenario(IFeatureLookupAgent agent, ConsoleOutputHelp
 }
 
 static async Task RunCoordinatorAssessment(
-    IFeatureLookupAgent lookupAgent,
-    ICoordinatorAgent coordinator,
+    IAssessmentWorkflow workflow,
     ConsoleOutputHelper outputHelper)
 {
     var query = outputHelper.PromptForCustomQuery();
@@ -261,30 +262,12 @@ static async Task RunCoordinatorAssessment(
 
     try
     {
-        // Step 1: Feature Lookup
-        AnsiConsole.MarkupLine("[bold yellow]Step 1:[/] Running Feature Lookup Agent...");
-        var lookupResult = await outputHelper.WithSpinner(
-            "Looking up feature...",
-            () => lookupAgent.LookupFeatureAsync(query, CancellationToken.None));
-
-        outputHelper.DisplayResult(lookupResult, stopwatch.Elapsed);
-
-        if (!lookupResult.IsSuccess)
-        {
-            AnsiConsole.MarkupLine("[red]Feature lookup failed — skipping coordinator.[/]");
-            return;
-        }
-
-        // Step 2: Build state and run Coordinator
-        var state = AssessmentState.FromFeatureLookupResult(lookupResult);
-
-        AnsiConsole.MarkupLine("[bold yellow]Step 2:[/] Running Coordinator Agent...");
-        var assessmentState = await outputHelper.WithSpinner(
-            "Assessing feature readiness...",
-            () => coordinator.AssessAsync(state, CancellationToken.None));
+        var finalState = await outputHelper.WithSpinner(
+            "Running assessment pipeline (Lookup → Coordinator)...",
+            () => workflow.RunAsync(query, CancellationToken.None));
 
         stopwatch.Stop();
-        outputHelper.DisplayCoordinatorResult(assessmentState, stopwatch.Elapsed);
+        outputHelper.DisplayCoordinatorResult(finalState, stopwatch.Elapsed);
     }
     catch (Exception ex)
     {
