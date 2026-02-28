@@ -248,6 +248,21 @@ dotnet clean  # Clean artifacts
 - Never manually edit `.csproj` files unless absolutely necessary
 - Update this CLAUDE.md when architecture changes
 
+**Testing Patterns and Path Considerations:**
+- Maintain the same unit+integration testing pattern for all tasks to ensure consistency.
+- When implementing agents that consume previously-tested tools, path resolution is generally not a concern; rely on existing tool validations.
+- Early tasks may not verify nested tracing; explicit trace/span verification should be deferred to later end-to-end tests as noted in individual task plans.
+
+**Test Harness Integration (CRITICAL):**
+- **EVERY time a new agent, tool, or feature is implemented**, add corresponding test scenarios to `tests/FeatureAssessment.TestHarness/TestScenarios.cs`
+- Test scenarios should include:
+  - Happy path scenario demonstrating the new feature working correctly
+  - Edge case or error handling scenario
+  - Integration scenario showing how the feature works with existing agents/tools
+- Format: Add new category to `TestScenarios.Scenarios` dictionary with at least 2-3 `TestScenario` entries
+- Rationale: The test harness is the primary manual verification tool - all implemented features MUST be demonstrable through it
+- This rule applies to: Agents, Tools, Prompts, and any public feature affecting workflow or decision-making
+
 ## Implementation Workflow (MANDATORY)
 
 **CRITICAL: All implementation work MUST follow the four-stage development process defined in [WORKFLOW_STATUS.md](WORKFLOW_STATUS.md).**

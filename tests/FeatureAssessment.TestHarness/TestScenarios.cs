@@ -99,6 +99,63 @@ public static class TestScenarios
                 "May pick first mentioned or ask for clarification"
             ),
         },
+
+        ["Documentation Assessment - Agent Delegation"] = new()
+        {
+            new TestScenario(
+                "Coordinator calls Documentation Specialist",
+                "Is PLAT-1523 ready for production? Check the documentation first.",
+                "Should show: Coordinator → invokes Documentation Specialist → lists planning docs → reads docs → returns assessment to Coordinator"
+            ),
+            new TestScenario(
+                "Documentation Specialist lists available docs",
+                "What planning documents exist for feature1?",
+                "Should show: Lists all .md files in feature1/planning/ directory"
+            ),
+            new TestScenario(
+                "Documentation Specialist assesses completeness",
+                "Is the USER_STORY complete for feature1?",
+                "Should show: Reads USER_STORY.md → reports sections present/missing → no judgment calls"
+            ),
+        },
+
+        ["Documentation Assessment - Happy Path"] = new()
+        {
+            new TestScenario(
+                "Feature with complete documentation",
+                "Check documentation status for PLAT-1523",
+                "Should report on USER_STORY.md, DESIGN_DOC.md, DEPLOYMENT_PLAN.md completeness"
+            ),
+            new TestScenario(
+                "Multiple documents assessment",
+                "Verify all planning documents for feature2",
+                "Should list found docs + report which documents are missing"
+            ),
+            new TestScenario(
+                "Specific document query",
+                "What's in the ARCHITECTURE document for feature1?",
+                "Should read and summarize ARCHITECTURE.md content"
+            ),
+        },
+
+        ["Documentation Assessment - Error Handling"] = new()
+        {
+            new TestScenario(
+                "Feature with no documentation",
+                "Check planning docs for feature4",
+                "Should report 'No planning documents found' gracefully (no crash)"
+            ),
+            new TestScenario(
+                "Missing specific document",
+                "Does feature3 have a DEPLOYMENT_PLAN?",
+                "Should report document as missing without throwing exception"
+            ),
+            new TestScenario(
+                "Invalid feature ID",
+                "Get documentation for nonexistent-feature-xyz",
+                "Should report feature not found in planning directory"
+            ),
+        },
     };
 
     /// <summary>
