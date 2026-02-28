@@ -1503,7 +1503,8 @@ START -> lookup_feature -> coordinator -> END
 
 **Approach 1: LLM with Tool Calling**
 
-- Use a foundation model (e.g., GPT-4, Claude) with tool-calling capabilities
+- Use a foundation model with tool-calling capabilities
+- **Implementation**: Ollama with Qwen2.5 (localhost:11434 in Docker)
 - Provide tools to the agent
 - Let the model decide when and how to use tools
 - Best for: Coordinator, Lookup Agent

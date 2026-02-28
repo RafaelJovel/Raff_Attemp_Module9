@@ -39,6 +39,24 @@ Every work item follows a structured four-stage process to ensure quality, consi
     - More than 20 tests in a single file
     - More than 500 lines in a test file
     - Tests covering more than 3 distinct concerns
+  - **Investigation Protocol for Test Failures** (MANDATORY):
+    - When tests fail, follow debugging checklist BEFORE deferring:
+      1. **Capture full error message/stack trace** - Document the exact error, not assumptions
+      2. **Verify external dependencies are running** - Check services, databases, APIs (e.g., `curl http://service/health`)
+      3. **Test external dependencies independently** - Verify connectivity and availability separately
+      4. **Check logs from external services** - Look for errors in service logs
+      5. **Isolate the failure point** - Is it connection? Authentication? API compatibility? Data format?
+    - **Only defer to future task if:**
+      - Root cause is clearly identified with evidence AND
+      - External blocker beyond our control (upstream bug, unavailable resource) AND
+      - Workaround or fix requires significant refactoring
+    - **Document evidence, not assumptions**:
+      - ❌ BAD: "Ollama isn't working" or "Semantic Kernel incompatible with Ollama"
+      - ✅ GOOD: "Error: Connection refused. Ollama not running at localhost:11434. Evidence: curl test failed."
+      - ✅ GOOD: "Endpoint requires /v1 suffix. Evidence: curl to /v1/chat/completions succeeds, without /v1 fails."
+    - **Deferral requires documented evidence**:
+      - Write: "Root Cause: [specific finding with evidence from steps 1-5]"
+      - Include: Actual error messages, test results, curl outputs, log excerpts
 - **Output**: Working, tested code that satisfies the acceptance criteria
 - **Completion Criteria**: ALL quality validation passes cleanly without errors or warnings
 
@@ -210,7 +228,7 @@ npm run type-check                                    # TypeScript validation
 npm run lint                                          # ESLint (if configured)
 
 # Before merging to main (run all tests including integration):
-dotnet test --filter "Category!=Integration"          # Fast unit tests during dev
+dotnet test --filter "TestCategory!=Integration"          # Fast unit tests during dev
 dotnet test                                           # All tests including integration
 npm test                                              # Frontend tests
 ```
