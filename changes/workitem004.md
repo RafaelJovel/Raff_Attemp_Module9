@@ -227,7 +227,64 @@ Modified files:
 
 ### Task 3: ConsultationTool & Coordinator Integration
 
-**Status**: � IN PROGRESS (PLAN stage)
+**Status**: ✅ COMPLETED
+
+**Acceptance Criteria (Given-When-Then):**
+
+> **Given** a coordinator needing documentation assessment
+> **When** coordinator has `consult_docs_specialist` tool available
+> **Then**:
+> - Tool takes query and feature_id parameters
+> - Tool internally invokes DocumentationSpecialistAgent
+> - Tool returns specialist's findings as string
+> - Coordinator can see and reference the findings in reasoning
+
+**Summary:**
+Task 3 implementation successfully added:
+- `IConsultDocumentationSpecialistTool` interface as Semantic Kernel plugin contract
+- `ConsultDocumentationSpecialistTool` implementation that wraps DocumentationSpecialistAgent
+- Added `[KernelFunction]` attributes to both DocumentationTools and ConsultDocumentationSpecialistTool methods
+- Updated CoordinatorAgent to accept optional documentation specialist agent
+- Modified CoordinatorAgent to register ConsultDocumentationSpecialistTool in kernel when specialist provided
+- Updated KernelFactory to register documentation tools as plugins
+- Enhanced CoordinatorSystemPrompt to describe documentation specialist consultation capability
+- Added comprehensive unit tests for tool delegation and kernel registration
+- Added integration tests validating full tool workflow with real agent
+
+**Test Results:**
+- All 4 consult tool tests pass
+- All 89 unit tests pass
+- 1 pre-existing Ollama end-to-end test fails (external dependency, unrelated to Task 3)
+- 116 integration tests pass
+
+**Reflection & Adaptation:**
+
+- **What went well:** The plugin registration pattern with [KernelFunction] attributes was straightforward once clarified. The separation of concerns (tool wraps agent) kept the design clean.
+- **What was learned:** KernelFunction attributes must be present on methods or Semantic Kernel plugin registration fails. The clean rebuild was necessary to ensure fresh compilation of the attributes.
+- **Process improvement:** Added proper tests for KernelFactory to verify documentation plugin registration, improving test coverage.
+- **Future consideration:** Task 4 will need to verify nested trace hierarchy when coordinator invokes the consult tool; this integration is now in place.
+
+**File Changes:**
+
+New files:
+- `src/FeatureAssessment.Core/Tools/IConsultDocumentationSpecialistTool.cs` — Interface definition
+- `src/FeatureAssessment.Core/Tools/ConsultDocumentationSpecialistTool.cs` — Implementation
+- `tests/FeatureAssessment.Core.Tests/Tools/ConsultDocumentationSpecialistToolTests.cs` — Unit tests
+- `tests/FeatureAssessment.Core.Tests/Integration/ConsultDocumentationSpecialistToolIntegrationTests.cs` — Integration tests
+- `tests/FeatureAssessment.Core.Tests/Clients/KernelFactoryTests.cs` — KernelFactory plugin registration tests
+
+Modified files:
+- `src/FeatureAssessment.Core/Tools/DocumentationTools.cs` — Added [KernelFunction] attributes
+- `src/FeatureAssessment.Core/Agents/CoordinatorAgent.cs` — Register ConsultDocumentationSpecialistTool in kernel
+- `src/FeatureAssessment.Core/Prompts/CoordinatorSystemPrompt.cs` — Add documentation specialist to delegation instructions
+- `src/FeatureAssessment.Core/Clients/KernelFactory.cs` — Register documentation tools as plugins
+- `tests/FeatureAssessment.Core.Tests/Agents/CoordinatorAgentTests.cs` — Add test for tool registration
+
+---
+
+### Task 4: End-to-End Testing & Tracing
+
+**Status**: 🔳 NOT STARTED
 
 **Acceptance Criteria (Given-When-Then):**
 
