@@ -1,4 +1,5 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 
 namespace FeatureAssessment.Core.Tools;
 
@@ -38,6 +39,7 @@ public class DocumentationTools : IDocumentationTools
     /// <summary>
     /// Lists all available planning documents for a feature.
     /// </summary>
+    [KernelFunction]
     public async Task<List<string>> ListPlanningDocsAsync(string featureId)
     {
         return await Task.Run(() =>
@@ -74,6 +76,7 @@ public class DocumentationTools : IDocumentationTools
     /// <summary>
     /// Reads the content of a specific planning document.
     /// </summary>
+    [KernelFunction]
     public async Task<string> ReadPlanningDocAsync(string featureId, string docName)
     {
         return await Task.Run(() =>

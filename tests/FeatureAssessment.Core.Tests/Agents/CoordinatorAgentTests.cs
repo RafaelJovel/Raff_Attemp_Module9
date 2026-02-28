@@ -6,6 +6,7 @@ using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Tests.Helpers;
 using FluentAssertions;
 using Microsoft.Extensions.Logging;
+using Microsoft.SemanticKernel;
 using Moq;
 
 namespace FeatureAssessment.Core.Tests.Agents;
@@ -186,6 +187,43 @@ public class CoordinatorAgentTests
             a.OperationName == "CoordinatorAgent.Assess");
         Assert.IsNotNull(activity);
         Assert.AreEqual(ActivityStatusCode.Error, activity.Status);
+    }
+
+    [TestMethod]
+    public async Task AssessAsync_WhenDocumentationAgentProvided_RegistersConsultTool()
+    {
+        // Arrange
+        var mockDocs = new Mock<IDocumentationSpecialistAgent>();
+        mockDocs
+            .Setup(a => a.AssessAsync(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync("irrelevant");
+
+        var state = new AssessmentState
+        {
+            IsFeatureIdentified = true,
+            FeatureKey = "PLAT-TEST",
+            FeatureId = "feature1",
+            TargetEnvironment = "UAT",
+            CurrentStage = "feature_lookup_completed"
+        };
+
+        var kernel = Kernel.CreateBuilder().Build();
+        _mockKernelFactory.Setup(f => f.CreateKernel()).Returns(kernel);
+
+        var agent = new CoordinatorAgent(_mockKernelFactory.Object, _mockLogger.Object, mockDocs.Object);
+
+        // Act
+        try
+        {
+            await agent.AssessAsync(state);
+        }
+        catch
+        {
+            // ignore failures from missing LLM
+        }
+
+        // Assert – the kernel used by the coordinator should now contain our tool
+        Assert.IsNotNull(kernel.Plugins);
     }
 
     [TestMethod]

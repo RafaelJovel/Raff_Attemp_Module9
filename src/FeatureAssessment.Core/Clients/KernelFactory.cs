@@ -70,6 +70,8 @@ public class KernelFactory : IKernelFactory
 
         if (_tools != null)
             builder.Plugins.AddFromObject(_tools, "FeatureLookup");
+        if (_documentationTools != null)
+            builder.Plugins.AddFromObject(_documentationTools, "Documentation");
 
         return builder.Build();
     }
@@ -97,6 +99,8 @@ public class KernelFactory : IKernelFactory
 
         if (_tools != null)
             builder.Plugins.AddFromObject(_tools, "FeatureLookup");
+        if (_documentationTools != null)
+            builder.Plugins.AddFromObject(_documentationTools, "Documentation");
 
         _logger.LogDebug("Anthropic kernel created successfully with IChatClient integration");
 

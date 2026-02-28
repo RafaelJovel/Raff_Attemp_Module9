@@ -3,6 +3,7 @@ using FeatureAssessment.Core.Clients;
 using FeatureAssessment.Core.Models;
 using FeatureAssessment.Core.Observability;
 using FeatureAssessment.Core.Prompts;
+using FeatureAssessment.Core.Tools;
 using Microsoft.Extensions.Logging;
 using Microsoft.SemanticKernel;
 using Microsoft.SemanticKernel.ChatCompletion;
@@ -18,13 +19,16 @@ public class CoordinatorAgent : ICoordinatorAgent
 {
     private readonly IKernelFactory _kernelFactory;
     private readonly ILogger<CoordinatorAgent> _logger;
+    private readonly IDocumentationSpecialistAgent? _documentationSpecialist;
 
     public CoordinatorAgent(
         IKernelFactory kernelFactory,
-        ILogger<CoordinatorAgent> logger)
+        ILogger<CoordinatorAgent> logger,
+        IDocumentationSpecialistAgent? documentationSpecialist = null)
     {
         _kernelFactory = kernelFactory ?? throw new ArgumentNullException(nameof(kernelFactory));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _documentationSpecialist = documentationSpecialist; // null means coordinator will not consult documentation
     }
 
     public async Task<AssessmentState> AssessAsync(
@@ -55,6 +59,17 @@ public class CoordinatorAgent : ICoordinatorAgent
         try
         {
             var kernel = _kernelFactory.CreateKernel();
+
+            // if a documentation specialist agent has been injected, expose a
+            // consult tool to the kernel so that the LLM can call it via function
+            // calling. This allows the coordinator prompt to "ask" the specialist
+            // for document assessments.
+            if (_documentationSpecialist != null)
+            {
+                var consultTool = new ConsultDocumentationSpecialistTool(_documentationSpecialist);
+                kernel.Plugins.AddFromObject(consultTool, "ConsultDocumentation");
+            }
+
             var userMessage = BuildUserMessage(state);
             var response = await ExecuteAgentAsync(kernel, userMessage, cancellationToken);
 

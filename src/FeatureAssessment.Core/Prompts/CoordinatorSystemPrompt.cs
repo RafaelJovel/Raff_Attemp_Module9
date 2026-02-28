@@ -44,6 +44,8 @@ public static class CoordinatorSystemPrompt
         2. Determine which criteria apply based on target environment
         3. Consult specialist agents to gather evidence:
            - Documentation Specialist: Assesses planning document completeness
+             (you can invoke the `consult_documentation_specialist` tool by
+             calling it with a query and a feature ID)
            - Metrics Specialist: Reports test coverage, security scan results, performance data
            - Reviews Specialist: Checks approval status from design/security/UAT reviews
         4. Map gathered evidence against the deployment criteria
